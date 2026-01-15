@@ -52,6 +52,14 @@ const isAdminUser = (jwtToken: string): boolean => {
   }
 };
 
+const TOKEN_STORAGE_KEY = 'cognito_jwt_token';
+const REFRESH_TOKEN_STORAGE_KEY = 'cognito_refresh_token';
+const USERNAME_STORAGE_KEY = 'cognito_username';
+const TOKEN_EXPIRY_STORAGE_KEY = 'cognito_token_expiry';
+
+// Refresh token 5 minutes before expiry
+const REFRESH_BUFFER_MS = 5 * 60 * 1000;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -59,32 +67,198 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [sessionData, setSessionData] = useState<string | null>(null); // Store session for OTP flow
 
+  // Helper to save token to localStorage
+  const saveToken = (jwtToken: string, refreshToken?: string, username?: string) => {
+    setToken(jwtToken);
+    setIsAuthenticated(true);
+    localStorage.setItem(TOKEN_STORAGE_KEY, jwtToken);
+    
+    if (refreshToken) {
+      localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, refreshToken);
+    }
+    
+    if (username) {
+      localStorage.setItem(USERNAME_STORAGE_KEY, username);
+    }
+    
+    // Calculate and store token expiry
+    try {
+      const payload = JSON.parse(atob(jwtToken.split('.')[1]));
+      const expiryTime = payload.exp * 1000; // Convert to milliseconds
+      localStorage.setItem(TOKEN_EXPIRY_STORAGE_KEY, expiryTime.toString());
+    } catch (error) {
+      console.error('Failed to parse token expiry:', error);
+    }
+  };
+
+  // Helper to clear token from localStorage
+  const clearToken = () => {
+    setToken(null);
+    setIsAuthenticated(false);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
+    localStorage.removeItem(USERNAME_STORAGE_KEY);
+    localStorage.removeItem(TOKEN_EXPIRY_STORAGE_KEY);
+  };
+
+  // Helper to check if token needs refresh
+  const needsRefresh = (): boolean => {
+    const expiryStr = localStorage.getItem(TOKEN_EXPIRY_STORAGE_KEY);
+    if (!expiryStr) return false;
+    
+    const expiryTime = parseInt(expiryStr, 10);
+    const now = Date.now();
+    
+    // Refresh if we're within the buffer time of expiry
+    return (expiryTime - now) < REFRESH_BUFFER_MS;
+  };
+
+  // Helper to refresh token using refresh token
+  const refreshAccessToken = async (): Promise<boolean> => {
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
+    const username = localStorage.getItem(USERNAME_STORAGE_KEY);
+    
+    if (!refreshToken || !username) {
+      return false;
+    }
+
+    try {
+      // For password-based auth, use Cognito SDK
+      const cognitoUser = userPool.getCurrentUser();
+      if (cognitoUser) {
+        return new Promise((resolve) => {
+          cognitoUser.getSession((err: Error | null, session: CognitoUserSession | null) => {
+            if (err || !session || !session.isValid()) {
+              clearToken();
+              resolve(false);
+              return;
+            }
+            
+            const jwtToken = session.getIdToken().getJwtToken();
+            if (isAdminUser(jwtToken)) {
+              setToken(jwtToken);
+              localStorage.setItem(TOKEN_STORAGE_KEY, jwtToken);
+              
+              // Update expiry
+              try {
+                const payload = JSON.parse(atob(jwtToken.split('.')[1]));
+                const expiryTime = payload.exp * 1000;
+                localStorage.setItem(TOKEN_EXPIRY_STORAGE_KEY, expiryTime.toString());
+              } catch (error) {
+                console.error('Failed to parse token expiry:', error);
+              }
+              
+              resolve(true);
+            } else {
+              clearToken();
+              resolve(false);
+            }
+          });
+        });
+      }
+      
+      // For email OTP auth, use AWS SDK InitiateAuth with REFRESH_TOKEN
+      const command = new InitiateAuthCommand({
+        ClientId: poolData.ClientId,
+        AuthFlow: 'REFRESH_TOKEN_AUTH',
+        AuthParameters: {
+          REFRESH_TOKEN: refreshToken,
+        },
+      });
+
+      const response = await cognitoClient.send(command);
+      
+      if (response.AuthenticationResult?.IdToken) {
+        const jwtToken = response.AuthenticationResult.IdToken;
+        
+        if (isAdminUser(jwtToken)) {
+          // Keep the same refresh token and username
+          saveToken(
+            jwtToken,
+            response.AuthenticationResult.RefreshToken || refreshToken,
+            username
+          );
+          return true;
+        }
+      }
+      
+      clearToken();
+      return false;
+    } catch (error) {
+      console.error('Failed to refresh token:', error);
+      clearToken();
+      return false;
+    }
+  };
+
   // Check if user is already authenticated on mount
   useEffect(() => {
-    const cognitoUser = userPool.getCurrentUser();
-    if (cognitoUser) {
-      cognitoUser.getSession((err: Error | null, session: CognitoUserSession | null) => {
-        if (err || !session) {
+    const initAuth = async () => {
+      // First, try to restore from localStorage
+      const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+      if (storedToken) {
+        // Check if token needs refresh
+        if (needsRefresh()) {
+          const refreshed = await refreshAccessToken();
+          setIsLoading(false);
+          if (refreshed) return;
+          // If refresh failed, fall through to clear and re-check
+        } else if (isAdminUser(storedToken)) {
+          // Token is still valid
+          setToken(storedToken);
+          setIsAuthenticated(true);
           setIsLoading(false);
           return;
+        } else {
+          // Invalid token, clear it
+          clearToken();
         }
-        if (session.isValid()) {
-          const jwtToken = session.getIdToken().getJwtToken();
-          if (isAdminUser(jwtToken)) {
-            setToken(jwtToken);
-            setIsAuthenticated(true);
-          } else {
-            // User is not an admin, sign them out
-            cognitoUser.signOut();
-            setError("Access denied: Admin privileges required");
+      }
+
+      // Fallback to checking Cognito session
+      const cognitoUser = userPool.getCurrentUser();
+      if (cognitoUser) {
+        cognitoUser.getSession((err: Error | null, session: CognitoUserSession | null) => {
+          if (err || !session) {
+            setIsLoading(false);
+            return;
           }
-        }
+          if (session.isValid()) {
+            const jwtToken = session.getIdToken().getJwtToken();
+            const refreshToken = session.getRefreshToken().getToken();
+            if (isAdminUser(jwtToken)) {
+              saveToken(jwtToken, refreshToken, cognitoUser.getUsername());
+            } else {
+              // User is not an admin, sign them out
+              cognitoUser.signOut();
+              setError("Access denied: Admin privileges required");
+            }
+          }
+          setIsLoading(false);
+        });
+      } else {
         setIsLoading(false);
-      });
-    } else {
-      setIsLoading(false);
-    }
+      }
+    };
+
+    initAuth();
   }, []);
+
+  // Set up automatic token refresh
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const checkAndRefresh = async () => {
+      if (needsRefresh()) {
+        await refreshAccessToken();
+      }
+    };
+
+    // Check every minute
+    const interval = setInterval(checkAndRefresh, 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
 
   const login = async (username: string, password: string): Promise<void> => {
     setError(null);
@@ -108,6 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cognitoUser.authenticateUser(authenticationDetails, {
         onSuccess: (session: CognitoUserSession) => {
           const jwtToken = session.getIdToken().getJwtToken();
+          const refreshToken = session.getRefreshToken().getToken();
           
           // Check if user is in admin group
           if (!isAdminUser(jwtToken)) {
@@ -118,8 +293,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return;
           }
           
-          setToken(jwtToken);
-          setIsAuthenticated(true);
+          saveToken(jwtToken, refreshToken, username);
           setIsLoading(false);
           resolve();
         },
@@ -137,8 +311,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (cognitoUser) {
       cognitoUser.signOut();
     }
-    setToken(null);
-    setIsAuthenticated(false);
+    clearToken();
   };
 
   const requestPasswordlessCode = async (email: string): Promise<void> => {
@@ -196,6 +369,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (response.AuthenticationResult?.IdToken) {
         const jwtToken = response.AuthenticationResult.IdToken;
+        const refreshToken = response.AuthenticationResult.RefreshToken;
         
         // Check if user is in admin group
         if (!isAdminUser(jwtToken)) {
@@ -205,8 +379,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           throw new Error("Access denied: Admin privileges required");
         }
         
-        setToken(jwtToken);
-        setIsAuthenticated(true);
+        saveToken(jwtToken, refreshToken, email);
         setSessionData(null);
         setIsLoading(false);
       } else {
