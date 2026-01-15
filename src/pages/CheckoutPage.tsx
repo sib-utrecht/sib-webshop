@@ -57,6 +57,9 @@ export function CheckoutPage() {
           variantId: item.variantId,
           quantity: item.quantity,
         })),
+        email: formData.email,
+        name: `${formData.firstName} ${formData.lastName}`,
+        comments: comments || undefined,
       });
 
       if (!result.success) {

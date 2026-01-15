@@ -9,6 +9,7 @@
  */
 
 import type * as checkout from "../checkout.js";
+import type * as orders from "../orders.js";
 import type * as products from "../products.js";
 import type * as seed from "../seed.js";
 import type * as stock from "../stock.js";
@@ -21,6 +22,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   checkout: typeof checkout;
+  orders: typeof orders;
   products: typeof products;
   seed: typeof seed;
   stock: typeof stock;

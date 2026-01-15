@@ -29,4 +29,27 @@ export default defineSchema({
   })
     .index("by_product_variant", ["productId", "variantId"])
     .index("by_product", ["productId"]),
+
+  orders: defineTable({
+    orderId: v.string(),
+    email: v.string(),
+    name: v.string(),
+    comments: v.optional(v.string()),
+    items: v.array(
+      v.object({
+        productId: v.id("products"),
+        productName: v.string(),
+        variantId: v.string(),
+        variantName: v.string(),
+        quantity: v.number(),
+        price: v.number(),
+      })
+    ),
+    totalAmount: v.number(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("completed"),
+      v.literal("cancelled")
+    ),
+  }).index("by_order_id", ["orderId"]),
 });
