@@ -11,10 +11,10 @@ import type { Id } from "../../convex/_generated/dataModel";
 import ReactMarkdown from "react-markdown";
 
 export function ProductPage() {
-  const { id } = useParams<{ id: string }>();
+  const { productId } = useParams<{ productId: string }>();
   const product = useQuery(
-    api.products.getById,
-    id ? { id: id as Id<"products"> } : "skip"
+    api.products.getByProductId,
+    productId ? { productId } : "skip"
   );
   
   const stockData = useQuery(

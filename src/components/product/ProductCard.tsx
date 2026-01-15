@@ -6,6 +6,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 
 interface ProductCardProps {
   id: Id<"products">;
+  productId: string;
   name: string;
   description: string | null;
   shortDescription?: string;
@@ -20,6 +21,7 @@ interface ProductCardProps {
 
 export function ProductCard({
   id,
+  productId,
   name,
   description,
   shortDescription,
@@ -35,7 +37,7 @@ export function ProductCard({
       : `€${minPrice.toFixed(2)} - €${maxPrice.toFixed(2)}`;
 
   return (
-    <Link to={`/product/${id}`}>
+    <Link to={`/product/${productId}`}>
       <Card className="group overflow-hidden transition-all hover:shadow-lg h-full flex flex-col">
         <div className="aspect-square overflow-hidden bg-muted">
           <img
