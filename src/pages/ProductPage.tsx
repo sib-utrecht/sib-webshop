@@ -16,6 +16,12 @@ export function ProductPage() {
     api.products.getById,
     id ? { id: id as Id<"products"> } : "skip"
   );
+  
+  const stockData = useQuery(
+    api.stock.getAllStock,
+    product ? { productId: product._id } : "skip"
+  );
+  
   const { addItem, items } = useCart();
   const [justAdded, setJustAdded] = useState(false);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
@@ -33,6 +39,10 @@ export function ProductPage() {
   const selectedVariant = product?.variants.find(
     (v) => v.variantId === selectedVariantId
   );
+  
+  const selectedStock = stockData?.find(
+    (s) => s.variantId === selectedVariantId
+  );
 
   const isInCart = items.some(
     (item) =>
@@ -49,6 +59,10 @@ export function ProductPage() {
 
   const canAddToCart = () => {
     if (!product || !selectedVariant) return false;
+    
+    // Check stock availability
+    if (selectedStock && selectedStock.available <= 0) return false;
+    
     if (selectedVariant.requiredAgreements && selectedVariant.requiredAgreements.length > 0 && !agreedToTerms) {
       return false;
     }
@@ -176,20 +190,35 @@ export function ProductPage() {
                 {product.variants.length > 1 ? "Select Option" : "Option"}
               </Label>
               <div className="mt-2 flex flex-wrap gap-2">
-                {product.variants.map((variant) => (
-                  <Button
-                    key={variant.variantId}
-                    variant={selectedVariantId === variant.variantId ? "default" : "outline"}
-                    onClick={() => {
-                      setSelectedVariantId(variant.variantId);
-                      setAgreedToTerms(false);
-                    }}
-                    className="flex-col h-auto py-2 px-4"
-                  >
-                    <span className="font-medium">{variant.name}</span>
-                    <span className="text-xs">€{variant.price.toFixed(2)}</span>
-                  </Button>
-                ))}
+                {product.variants.map((variant) => {
+                  const variantStock = stockData?.find((s) => s.variantId === variant.variantId);
+                  const isOutOfStock = variantStock && variantStock.available <= 0;
+                  const isLowStock = variantStock && variantStock.available > 0 && variantStock.available <= 5 && variantStock.available < 999999;
+                  
+                  return (
+                    <Button
+                      key={variant.variantId}
+                      variant={selectedVariantId === variant.variantId ? "default" : "outline"}
+                      onClick={() => {
+                        setSelectedVariantId(variant.variantId);
+                        setAgreedToTerms(false);
+                      }}
+                      disabled={isOutOfStock}
+                      className="flex-col h-auto py-2 px-4 relative"
+                    >
+                      <span className="font-medium">{variant.name}</span>
+                      <span className="text-xs">€{variant.price.toFixed(2)}</span>
+                      {isOutOfStock && (
+                        <span className="text-xs text-destructive mt-1">Out of stock</span>
+                      )}
+                      {isLowStock && !isOutOfStock && (
+                        <span className="text-xs text-orange-600 mt-1">
+                          Only {variantStock.available} left
+                        </span>
+                      )}
+                    </Button>
+                  );
+                })}
               </div>
             </div>
 
@@ -199,6 +228,16 @@ export function ProductPage() {
                 {selectedVariant.maxQuantity && (
                   <p className="mt-1 text-sm text-muted-foreground">
                     Max {selectedVariant.maxQuantity} per order
+                  </p>
+                )}
+                {selectedStock && selectedStock.available > 0 && selectedStock.available < 999999 && (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {selectedStock.available} in stock
+                  </p>
+                )}
+                {selectedStock && selectedStock.available <= 0 && (
+                  <p className="mt-1 text-sm text-destructive font-semibold">
+                    Out of stock
                   </p>
                 )}
               </div>
@@ -251,6 +290,12 @@ export function ProductPage() {
             {!canAddToCart() && selectedVariant?.requiredAgreements && !agreedToTerms && (
               <p className="text-sm text-destructive">
                 Please agree to the terms above to continue
+              </p>
+            )}
+            
+            {!canAddToCart() && selectedStock && selectedStock.available <= 0 && (
+              <p className="text-sm text-destructive">
+                This item is currently out of stock
               </p>
             )}
 

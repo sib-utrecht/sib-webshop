@@ -8,8 +8,10 @@
  * @module
  */
 
+import type * as checkout from "../checkout.js";
 import type * as products from "../products.js";
 import type * as seed from "../seed.js";
+import type * as stock from "../stock.js";
 
 import type {
   ApiFromModules,
@@ -18,8 +20,10 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  checkout: typeof checkout;
   products: typeof products;
   seed: typeof seed;
+  stock: typeof stock;
 }>;
 
 /**

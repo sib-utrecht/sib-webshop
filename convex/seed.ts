@@ -1,5 +1,6 @@
 import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
 
 const codeOfConductAgreement =
   "I agree with the [Code of conduct](https://sib-utrecht.nl/code-of-conduct)";
@@ -217,17 +218,47 @@ export const seed = internalMutation({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
-    // Clear existing products first
-    const existing = await ctx.db.query("products").collect();
-    for (const product of existing) {
+    // Clear existing data
+    const existingProducts = await ctx.db.query("products").collect();
+    for (const product of existingProducts) {
       await ctx.db.delete(product._id);
     }
-
-    // Insert all mock products
-    for (const product of mockProducts) {
-      await ctx.db.insert("products", product);
+    
+    const existingStock = await ctx.db.query("stock").collect();
+    for (const stock of existingStock) {
+      await ctx.db.delete(stock._id);
     }
-    console.log(`Seeded ${mockProducts.length} products`);
+
+    // Insert all mock products and initialize stock
+    for (const product of mockProducts) {
+      const productId: Id<"products"> = await ctx.db.insert("products", product);
+      
+      // Initialize stock for each variant
+      for (const variant of product.variants) {
+        let quantity: number;
+        
+        // Set stock quantities based on product type
+        if (product.isVirtual) {
+          // Virtual products have unlimited stock
+          quantity = 999999;
+        } else if (product.productId === "gala2026") {
+          // Limited tickets for gala
+          quantity = 50;
+        } else {
+          // Physical merchandise
+          quantity = 20;
+        }
+        
+        await ctx.db.insert("stock", {
+          productId,
+          variantId: variant.variantId,
+          quantity,
+          reserved: 0,
+        });
+      }
+    }
+    
+    console.log(`Seeded ${mockProducts.length} products with stock`);
     return null;
   },
 });

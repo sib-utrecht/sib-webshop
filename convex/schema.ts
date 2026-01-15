@@ -20,4 +20,13 @@ export default defineSchema({
       })
     ),
   }).index("by_product_id", ["productId"]),
+
+  stock: defineTable({
+    productId: v.id("products"),
+    variantId: v.string(),
+    quantity: v.number(),
+    reserved: v.number(), // Items in carts but not yet purchased
+  })
+    .index("by_product_variant", ["productId", "variantId"])
+    .index("by_product", ["productId"]),
 });

@@ -7,11 +7,16 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCart } from "@/context/CartContext";
 import ReactMarkdown from "react-markdown";
+import { useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
 
 export function CheckoutPage() {
   const { items, totalPrice, removeItem, clearCart, updateAgreement } = useCart();
+  const processCheckout = useMutation(api.checkout.processCheckout);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [orderId, setOrderId] = useState("");
+  const [error, setError] = useState("");
   const [comments, setComments] = useState("");
 
   const [formData, setFormData] = useState({
@@ -42,13 +47,35 @@ export function CheckoutPage() {
     if (!canCheckout) return;
 
     setIsSubmitting(true);
+    setError("");
 
-    // Simulate payment processing
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      // Process checkout and decrement stock
+      const result = await processCheckout({
+        items: items.map((item) => ({
+          productId: item.productId,
+          variantId: item.variantId,
+          quantity: item.quantity,
+        })),
+      });
 
-    setIsSubmitting(false);
-    setIsComplete(true);
-    clearCart();
+      if (!result.success) {
+        setError(result.message);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Simulate payment processing
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      setOrderId(result.orderId || "");
+      setIsSubmitting(false);
+      setIsComplete(true);
+      clearCart();
+    } catch (err) {
+      setError("An error occurred during checkout. Please try again.");
+      setIsSubmitting(false);
+    }
   };
 
   if (isComplete) {
@@ -62,7 +89,7 @@ export function CheckoutPage() {
             {formData.email}.
           </p>
           <p className="text-sm text-muted-foreground mb-6">
-            Order #SIB-{Math.random().toString(36).substring(2, 8).toUpperCase()}
+            Order #{orderId}
           </p>
           <Button asChild>
             <Link to="/">Continue Shopping</Link>
@@ -249,6 +276,12 @@ export function CheckoutPage() {
               </div>
 
               <div className="pt-4">
+                {error && (
+                  <div className="mb-4 p-3 border border-destructive/50 bg-destructive/10 rounded-md flex items-start gap-2">
+                    <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                    <p className="text-sm text-destructive">{error}</p>
+                  </div>
+                )}
                 <Button
                   type="submit"
                   size="lg"
