@@ -5,6 +5,9 @@ import { ProductPage } from "@/pages/ProductPage";
 import { CheckoutPage } from "@/pages/CheckoutPage";
 import { OrdersPage } from "@/pages/OrdersPage";
 import { StockOverviewPage } from "@/pages/StockOverviewPage";
+import { LoginPage } from "@/pages/LoginPage";
+import { DebugPage } from "@/pages/DebugPage";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 function App() {
   return (
@@ -14,8 +17,24 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/product/:productId" element={<ProductPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
-          <Route path="/orders" element={<OrdersPage />} />
-          <Route path="/stock" element={<StockOverviewPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/debug" element={<DebugPage />} />
+          <Route
+            path="/orders"
+            element={
+              <ProtectedRoute>
+                <OrdersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/stock"
+            element={
+              <ProtectedRoute>
+                <StockOverviewPage />
+              </ProtectedRoute>
+            }
+          />
         </Route>
       </Routes>
     </BrowserRouter>
@@ -23,3 +42,4 @@ function App() {
 }
 
 export default App;
+

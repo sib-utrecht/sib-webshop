@@ -1,53 +1,111 @@
-# React + TypeScript + Vite
+# SIB Webshop
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+E-commerce platform for SIB-Utrecht built with React, TypeScript, Convex, and AWS Cognito authentication.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- 🛍️ Product catalog with variants (sizes, types, price tiers)
+- 🛒 Shopping cart with persistent state
+- 💳 Checkout process with stock validation
+- 📦 Real-time stock management
+- 🔐 Admin authentication with AWS Cognito
+- 📊 Admin dashboard for orders and stock
 
-## React Compiler
+## Authentication
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Admin pages (Orders and Stock) require authentication. The system uses AWS Cognito for JWT-based authentication.
 
-## Expanding the ESLint configuration
+**Quick Links:**
+- [Setup Guide](AUTH_SETUP.md) - Complete AWS Cognito setup instructions
+- [Implementation Details](AUTH_IMPLEMENTATION.md) - Technical implementation overview
+- [Quick Reference](AUTH_QUICKSTART.md) - Quick commands and code snippets
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Getting Started
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Prerequisites
+- Node.js 18+
+- npm or yarn
+- Convex account
+- AWS Cognito User Pool (for admin authentication)
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Installation
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+1. Clone the repository
+```bash
+git clone https://github.com/sib-utrecht/sib-webshop.git
+cd sib-webshop
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+2. Install dependencies
+```bash
+npm install
+```
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
+3. Set up environment variables
+```bash
+cp .env.example .env.local
+# Edit .env.local with your Convex and AWS Cognito credentials
+```
+
+4. Configure Convex
+```bash
+npx convex dev
+```
+
+5. Set Convex environment variables
+```bash
+npx convex env set COGNITO_DOMAIN your-cognito-domain
+npx convex env set COGNITO_CLIENT_ID your-client-id
+```
+
+6. Seed the database (optional)
+```bash
+npx convex run seed:seed
+```
+
+7. Start the development server
+```bash
+npm run dev
+```
+
+## Project Structure
+
+See [agents.md](agents.md) for detailed project documentation including:
+- Complete feature requirements
+- Tech stack details
+- Database schema
+- API reference
+- User flows
+
+## Development
+
+### Build
+```bash
+npm run build
+```
+
+### Lint
+```bash
+npm run lint
+```
+
+### Type Check
+```bash
+tsc -b
+```
+
+## Tech Stack
+
+- **Frontend**: React 19, TypeScript, Tailwind CSS v4
+- **Backend**: Convex (serverless)
+- **Auth**: AWS Cognito
+- **UI Components**: Shadcn UI
+- **Routing**: React Router v7
+- **Build Tool**: Vite
+
+## License
+
+Copyright © 2025 SIB-Utrecht
 import reactDom from 'eslint-plugin-react-dom'
 
 export default defineConfig([

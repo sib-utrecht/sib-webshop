@@ -1,5 +1,6 @@
 import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+import { requireAdmin } from "./auth";
 
 export const getStock = query({
   args: { productId: v.id("products"), variantId: v.string() },
@@ -66,6 +67,8 @@ export const updateStock = mutation({
   },
   returns: v.id("stock"),
   handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    
     const existing = await ctx.db
       .query("stock")
       .withIndex("by_product_variant", (q) =>

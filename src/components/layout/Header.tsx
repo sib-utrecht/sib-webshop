@@ -1,13 +1,21 @@
-import { Link } from "react-router-dom";
-import { ShoppingCart, Store, Package, Box } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { ShoppingCart, Store, Package, Box, LogOut, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
 import { CartDrawer } from "@/components/cart/CartDrawer";
 import { useState } from "react";
 
 export function Header() {
   const { totalItems } = useCart();
+  const { isAuthenticated, logout } = useAuth();
   const [cartOpen, setCartOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -24,20 +32,24 @@ export function Header() {
           >
             Products
           </Link>
-          <Link
-            to="/orders"
-            className="text-sm font-medium transition-colors hover:text-primary flex items-center gap-1"
-          >
-            <Package className="h-4 w-4" />
-            Orders
-          </Link>
-          <Link
-            to="/stock"
-            className="text-sm font-medium transition-colors hover:text-primary flex items-center gap-1"
-          >
-            <Box className="h-4 w-4" />
-            Stock
-          </Link>
+          {isAuthenticated && (
+            <>
+              <Link
+                to="/orders"
+                className="text-sm font-medium transition-colors hover:text-primary flex items-center gap-1"
+              >
+                <Package className="h-4 w-4" />
+                Orders
+              </Link>
+              <Link
+                to="/stock"
+                className="text-sm font-medium transition-colors hover:text-primary flex items-center gap-1"
+              >
+                <Box className="h-4 w-4" />
+                Stock
+              </Link>
+            </>
+          )}
           <Button
             variant="outline"
             size="icon"
@@ -51,6 +63,25 @@ export function Header() {
               </span>
             )}
           </Button>
+          {isAuthenticated ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleLogout}
+              title="Logout"
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/login")}
+              title="Login"
+            >
+              <LogIn className="h-5 w-5" />
+            </Button>
+          )}
         </nav>
       </div>
 

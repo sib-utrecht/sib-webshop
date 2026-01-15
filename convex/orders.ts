@@ -1,5 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
+import { requireAdmin } from "./auth";
 
 export const list = query({
   args: {},
@@ -30,6 +31,8 @@ export const list = query({
     })
   ),
   handler: async (ctx) => {
+    await requireAdmin(ctx);
+    
     const orders = await ctx.db.query("orders").order("desc").collect();
     return orders;
   },

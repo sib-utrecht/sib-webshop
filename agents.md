@@ -2,6 +2,8 @@
 
 ## Overview
 
+IMPORTANT: Check files for errors after editing them!
+
 The SIB Webshop is a modern e-commerce platform built for SIB-Utrecht, a student organization. It provides a simple but elegant shopping experience for members to purchase event tickets, merchandise, and make donations.
 
 ## Requirements
