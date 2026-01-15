@@ -4,7 +4,7 @@ export function Footer() {
       <div className="container mx-auto px-4 py-8">
         <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
           <p className="text-sm text-muted-foreground">
-            © 2026 SIB Shop. All rights reserved.
+            © 2026 SIB-Utrecht. All rights reserved.
           </p>
           <nav className="flex gap-4">
             <a
