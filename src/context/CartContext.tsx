@@ -3,17 +3,23 @@ import type { Id } from "../../convex/_generated/dataModel";
 
 export interface CartItem {
   productId: Id<"products">;
+  variantId: string;
   name: string;
+  variantName: string;
   price: number;
   imageUrl: string;
   quantity: number;
+  maxQuantity?: number;
+  requiredAgreements?: string[];
+  agreedToTerms?: boolean;
 }
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, "quantity">) => void;
-  removeItem: (productId: Id<"products">) => void;
-  updateQuantity: (productId: Id<"products">, quantity: number) => void;
+  addItem: (item: Omit<CartItem, "quantity" | "agreedToTerms">) => void;
+  removeItem: (productId: Id<"products">, variantId: string) => void;
+  updateQuantity: (productId: Id<"products">, variantId: string, quantity: number) => void;
+  updateAgreement: (productId: Id<"products">, variantId: string, agreed: boolean) => void;
   clearCart: () => void;
   totalItems: number;
   totalPrice: number;
@@ -36,31 +42,64 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
   }, [items]);
 
-  const addItem = (item: Omit<CartItem, "quantity">) => {
+  const addItem = (item: Omit<CartItem, "quantity" | "agreedToTerms">) => {
     setItems((prev) => {
-      const existing = prev.find((i) => i.productId === item.productId);
+      const existing = prev.find(
+        (i) => i.productId === item.productId && i.variantId === item.variantId
+      );
       if (existing) {
+        const newQuantity = existing.quantity + 1;
+        if (item.maxQuantity && newQuantity > item.maxQuantity) {
+          return prev; // Don't add if max quantity reached
+        }
         return prev.map((i) =>
-          i.productId === item.productId
-            ? { ...i, quantity: i.quantity + 1 }
+          i.productId === item.productId && i.variantId === item.variantId
+            ? { ...i, quantity: newQuantity }
             : i
         );
       }
-      return [...prev, { ...item, quantity: 1 }];
+      return [
+        ...prev,
+        {
+          ...item,
+          quantity: 1,
+          agreedToTerms: item.requiredAgreements ? false : undefined,
+        },
+      ];
     });
   };
 
-  const removeItem = (productId: Id<"products">) => {
-    setItems((prev) => prev.filter((i) => i.productId !== productId));
+  const removeItem = (productId: Id<"products">, variantId: string) => {
+    setItems((prev) =>
+      prev.filter((i) => !(i.productId === productId && i.variantId === variantId))
+    );
   };
 
-  const updateQuantity = (productId: Id<"products">, quantity: number) => {
+  const updateQuantity = (productId: Id<"products">, variantId: string, quantity: number) => {
     if (quantity <= 0) {
-      removeItem(productId);
+      removeItem(productId, variantId);
       return;
     }
     setItems((prev) =>
-      prev.map((i) => (i.productId === productId ? { ...i, quantity } : i))
+      prev.map((i) => {
+        if (i.productId === productId && i.variantId === variantId) {
+          if (i.maxQuantity && quantity > i.maxQuantity) {
+            return i; // Don't update if exceeds max
+          }
+          return { ...i, quantity };
+        }
+        return i;
+      })
+    );
+  };
+
+  const updateAgreement = (productId: Id<"products">, variantId: string, agreed: boolean) => {
+    setItems((prev) =>
+      prev.map((i) =>
+        i.productId === productId && i.variantId === variantId
+          ? { ...i, agreedToTerms: agreed }
+          : i
+      )
     );
   };
 
@@ -81,6 +120,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         addItem,
         removeItem,
         updateQuantity,
+        updateAgreement,
         clearCart,
         totalItems,
         totalPrice,

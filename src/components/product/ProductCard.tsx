@@ -2,40 +2,37 @@ import { Link } from "react-router-dom";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useCart } from "@/context/CartContext";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 interface ProductCardProps {
   id: Id<"products">;
   name: string;
-  description: string;
-  price: number;
+  description: string | null;
+  shortDescription?: string;
   imageUrl: string;
-  category: string;
-  stock: number;
+  variants: Array<{
+    variantId: string;
+    name: string;
+    price: number;
+  }>;
+  isVirtual: boolean;
 }
 
 export function ProductCard({
   id,
   name,
   description,
-  price,
+  shortDescription,
   imageUrl,
-  category,
-  stock,
+  variants,
+  isVirtual,
 }: ProductCardProps) {
-  const { addItem } = useCart();
-
-  const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    addItem({
-      productId: id,
-      name,
-      price,
-      imageUrl,
-    });
-  };
+  const minPrice = Math.min(...variants.map((v) => v.price));
+  const maxPrice = Math.max(...variants.map((v) => v.price));
+  const priceDisplay =
+    minPrice === maxPrice
+      ? `€${minPrice.toFixed(2)}`
+      : `€${minPrice.toFixed(2)} - €${maxPrice.toFixed(2)}`;
 
   return (
     <Link to={`/product/${id}`}>
@@ -50,29 +47,24 @@ export function ProductCard({
         <CardContent className="flex-1 p-4">
           <div className="flex items-start justify-between gap-2">
             <h3 className="font-semibold line-clamp-1">{name}</h3>
-            <Badge variant="secondary" className="shrink-0">
-              {category}
-            </Badge>
+            {isVirtual && (
+              <Badge variant="secondary" className="shrink-0">
+                Virtual
+              </Badge>
+            )}
           </div>
           <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
-            {description}
+            {shortDescription || description || ""}
           </p>
-          <p className="mt-3 text-lg font-bold">${price.toFixed(2)}</p>
-          {stock < 10 && stock > 0 && (
-            <p className="text-xs text-orange-600 mt-1">Only {stock} left!</p>
-          )}
-          {stock === 0 && (
-            <p className="text-xs text-destructive mt-1">Out of stock</p>
+          <p className="mt-3 text-lg font-bold">{priceDisplay}</p>
+          {variants.length > 1 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {variants.length} options available
+            </p>
           )}
         </CardContent>
         <CardFooter className="p-4 pt-0">
-          <Button
-            onClick={handleAddToCart}
-            className="w-full"
-            disabled={stock === 0}
-          >
-            Add to Cart
-          </Button>
+          <Button className="w-full">View Details</Button>
         </CardFooter>
       </Card>
     </Link>

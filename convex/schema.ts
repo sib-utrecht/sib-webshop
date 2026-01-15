@@ -3,11 +3,21 @@ import { v } from "convex/values";
 
 export default defineSchema({
   products: defineTable({
+    productId: v.string(),
     name: v.string(),
-    description: v.string(),
-    price: v.number(),
+    description: v.union(v.string(), v.null()),
+    shortDescription: v.optional(v.string()),
     imageUrl: v.string(),
-    category: v.string(),
-    stock: v.number(),
-  }).index("by_category", ["category"]),
+    gallery: v.array(v.string()),
+    isVirtual: v.boolean(),
+    variants: v.array(
+      v.object({
+        variantId: v.string(),
+        name: v.string(),
+        price: v.number(),
+        maxQuantity: v.optional(v.number()),
+        requiredAgreements: v.optional(v.array(v.string())),
+      })
+    ),
+  }).index("by_product_id", ["productId"]),
 });

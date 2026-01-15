@@ -3,12 +3,20 @@ import type { Id } from "../../../convex/_generated/dataModel";
 
 interface Product {
   _id: Id<"products">;
+  productId: string;
   name: string;
-  description: string;
-  price: number;
+  description: string | null;
+  shortDescription?: string;
   imageUrl: string;
-  category: string;
-  stock: number;
+  gallery: string[];
+  isVirtual: boolean;
+  variants: Array<{
+    variantId: string;
+    name: string;
+    price: number;
+    maxQuantity?: number;
+    requiredAgreements?: string[];
+  }>;
 }
 
 interface ProductGridProps {
@@ -32,10 +40,10 @@ export function ProductGrid({ products }: ProductGridProps) {
           id={product._id}
           name={product.name}
           description={product.description}
-          price={product.price}
+          shortDescription={product.shortDescription}
           imageUrl={product.imageUrl}
-          category={product.category}
-          stock={product.stock}
+          variants={product.variants}
+          isVirtual={product.isVirtual}
         />
       ))}
     </div>

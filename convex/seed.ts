@@ -1,78 +1,215 @@
 import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 
+const codeOfConductAgreement =
+  "I agree with the [Code of conduct](https://sib-utrecht.nl/code-of-conduct)";
+
+const codeOfConductAgreementPlusOne =
+  "I agree with the [Code of conduct](https://sib-utrecht.nl/code-of-conduct), " +
+  "and I, as a SIB member, am responsible for any +1's I bring to follow these rules.";
+
 const mockProducts = [
   {
-    name: "Wireless Bluetooth Headphones",
+    productId: "gala2026",
+    name: "Gala 2026",
     description:
-      "Premium over-ear headphones with active noise cancellation, 30-hour battery life, and crystal-clear audio quality. Perfect for music lovers and professionals alike.",
-    price: 149.99,
-    imageUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&q=80",
-    category: "Electronics",
-    stock: 25,
+      "**..**\n\n" +
+      "... \n\n" +
+      "<br/>" +
+      "Note: In the comment box of checkout, please state your name.\n" +
+      "If you take a +1 with you, add a second ticket, and add their name too.\n\n" +
+      "<br/>By buying a ticket, you agree to the [Code of conduct](https://sib-utrecht.nl/code-of-conduct), and " +
+      "are responsible for any +1's you bring following these rules.",
+    shortDescription: "Join the end of year party! Take a +1 with you!",
+    imageUrl:
+      "https://sib-utrecht.nl/promo-images/2025/06/promo_90829f35_1000318283.jpg",
+    variants: [
+      {
+        variantId: "member",
+        name: "Member",
+        price: 9.5,
+        maxQuantity: 1,
+        requiredAgreements: [codeOfConductAgreementPlusOne],
+      },
+      {
+        variantId: "plusone",
+        name: "+1",
+        price: 11,
+        maxQuantity: 1,
+        requiredAgreements: [codeOfConductAgreementPlusOne],
+      },
+    ],
+    gallery: [
+      "https://sib-utrecht.nl/promo-images/2025/06/promo_90829f35_1000318283.jpg",
+    ],
+    isVirtual: false,
   },
   {
-    name: "Minimalist Leather Watch",
+    productId: "card-game",
+    name: "SIB playing cards",
     description:
-      "Elegant timepiece featuring genuine Italian leather strap, sapphire crystal glass, and Swiss movement. A classic accessory for any occasion.",
-    price: 199.99,
-    imageUrl: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&q=80",
-    category: "Accessories",
-    stock: 15,
+      "SIB playingcards!! Fancy any game of cards, the SIB playingcards are for you. " +
+      "Collect them at the GMA or any activity of choice:)",
+    imageUrl:
+      "https://sib-utrecht.nl/wp-content/uploads/public/card-game1.jpeg",
+    gallery: [
+      "https://sib-utrecht.nl/wp-content/uploads/public/card-game1.jpeg",
+    ],
+    variants: [
+      {
+        variantId: "default",
+        name: "Card game",
+        price: 3.79,
+      },
+    ],
+    isVirtual: false,
   },
   {
-    name: "Organic Cotton T-Shirt",
+    productId: "socks",
+    name: "SIB socks",
     description:
-      "Sustainably sourced 100% organic cotton t-shirt. Soft, breathable, and perfect for everyday wear. Available in multiple colors.",
-    price: 34.99,
-    imageUrl: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=500&q=80",
-    category: "Clothing",
-    stock: 50,
+      "Keep your feet warm with these cozy socks! Price per pair. " +
+      "Collect them at the GMA or an activity of your choice.",
+    imageUrl: "https://sib-utrecht.nl/wp-content/uploads/public/sokken1.jpg",
+    gallery: ["https://sib-utrecht.nl/wp-content/uploads/public/sokken1.jpg"],
+    variants: [
+      {
+        variantId: "size-36-42",
+        name: "36-42",
+        price: 3,
+      },
+      {
+        variantId: "size-42-46",
+        name: "42-46",
+        price: 3,
+      },
+    ],
+    isVirtual: false,
   },
   {
-    name: "Smart Home Speaker",
+    productId: "beer-mugs",
+    name: "SIB beer mug (glass)",
     description:
-      "Voice-controlled smart speaker with premium 360° sound, built-in virtual assistant, and smart home integration. Control your home with just your voice.",
-    price: 129.99,
-    imageUrl: "https://images.unsplash.com/photo-1543512214-318c7553f230?w=500&q=80",
-    category: "Electronics",
-    stock: 30,
+      "Enjoy your drink with these beer mugs! Price per mug. " +
+      "Collect them at the GMA or an activity of your choice.",
+    imageUrl:
+      "https://sib-utrecht.nl/wp-content/uploads/public/bierpul1.jpeg",
+    gallery: [
+      "https://sib-utrecht.nl/wp-content/uploads/public/bierpul1.jpeg",
+      "https://sib-utrecht.nl/wp-content/uploads/public/bierpul2.jpeg",
+    ],
+    variants: [
+      {
+        variantId: "with-sib-logo",
+        name: "With SIB logo",
+        price: 12,
+      },
+      {
+        variantId: "no-logo",
+        name: "No logo",
+        price: 8,
+      },
+    ],
+    isVirtual: false,
   },
   {
-    name: "Ceramic Pour-Over Coffee Set",
-    description:
-      "Handcrafted ceramic pour-over coffee maker with matching mug. Brew the perfect cup of coffee every morning with this artisan set.",
-    price: 54.99,
-    imageUrl: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=500&q=80",
-    category: "Home",
-    stock: 20,
+    productId: "sweater",
+    name: "SIB Sweater",
+    description: "Wear a cool sweater!",
+    imageUrl:
+      "https://sib-utrecht.nl/wp-content/uploads/public/sweaterparallax-600x600.jpg",
+    gallery: [
+      "https://sib-utrecht.nl/wp-content/uploads/public/sweaterwornfront_600x400.jpg",
+      "https://sib-utrecht.nl/wp-content/uploads/public/sweaterwornback_600x400.jpg",
+      "https://sib-utrecht.nl/wp-content/uploads/public/sweaterwornfrontsolo_600x900.jpg",
+      "https://sib-utrecht.nl/wp-content/uploads/public/sweaterwornbacksolo_600x900.jpg",
+    ],
+    variants: [
+      {
+        variantId: "size-small",
+        name: "S",
+        price: 26.5,
+      },
+      {
+        variantId: "size-medium",
+        name: "M",
+        price: 26.5,
+      },
+      {
+        variantId: "size-large",
+        name: "L",
+        price: 26.5,
+      },
+      {
+        variantId: "size-xlarge",
+        name: "XL",
+        price: 26.5,
+      },
+    ],
+    isVirtual: false,
   },
   {
-    name: "Bamboo Wireless Charger",
-    description:
-      "Eco-friendly wireless charging pad made from sustainable bamboo. Fast charging compatible with all Qi-enabled devices.",
-    price: 39.99,
-    imageUrl: "https://images.unsplash.com/photo-1586816879360-004f5b0c51e3?w=500&q=80",
-    category: "Electronics",
-    stock: 40,
+    productId: "tote_bag",
+    name: "Tote Bag",
+    description: null,
+    imageUrl:
+      "https://sib-utrecht.nl/wp-content/uploads/public/totebagparallax_600x600.jpg",
+    gallery: [
+      "https://sib-utrecht.nl/wp-content/uploads/public/totebagworn_600x600.jpg",
+      "https://sib-utrecht.nl/wp-content/uploads/public/totebagwornzoomedout_600x900.jpg",
+    ],
+    variants: [
+      {
+        variantId: "default",
+        name: "Tote Bag",
+        price: 3.0,
+      },
+    ],
+    isVirtual: false,
   },
   {
-    name: "Linen Throw Blanket",
-    description:
-      "Luxuriously soft French linen throw blanket. Perfect for cozy evenings on the couch or as a stylish bedroom accent.",
-    price: 89.99,
-    imageUrl: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=500&q=80",
-    category: "Home",
-    stock: 18,
+    productId: "dopper",
+    name: "Dopper",
+    description: null,
+    imageUrl:
+      "https://sib-utrecht.nl/wp-content/uploads/public/dopperparallax_600x600.jpg",
+    gallery: [
+      "https://sib-utrecht.nl/wp-content/uploads/public/dopperfront_600x600.jpg",
+    ],
+    variants: [
+      {
+        variantId: "default",
+        name: "Dopper",
+        price: 9.5,
+      },
+    ],
+    isVirtual: false,
   },
   {
-    name: "Canvas Backpack",
-    description:
-      "Durable waxed canvas backpack with leather accents. Features padded laptop compartment and multiple pockets for organization.",
-    price: 119.99,
-    imageUrl: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=500&q=80",
-    category: "Accessories",
-    stock: 22,
+    productId: "donation",
+    name: "Donation",
+    description: "Donate to SIB",
+    imageUrl:
+      "https://sib-utrecht.nl/wp-content/uploads/2024/11/domtorentjes_placeholder.png",
+    variants: [
+      {
+        variantId: "1",
+        name: "€ 1.00",
+        price: 1,
+      },
+      {
+        variantId: "5",
+        name: "€ 5.00",
+        price: 5,
+      },
+      {
+        variantId: "10",
+        name: "€ 10.00",
+        price: 10,
+      },
+    ],
+    gallery: [],
+    isVirtual: true,
   },
 ];
 
@@ -80,11 +217,10 @@ export const seed = internalMutation({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
-    // Check if products already exist
-    const existing = await ctx.db.query("products").first();
-    if (existing) {
-      console.log("Products already seeded");
-      return null;
+    // Clear existing products first
+    const existing = await ctx.db.query("products").collect();
+    for (const product of existing) {
+      await ctx.db.delete(product._id);
     }
 
     // Insert all mock products
