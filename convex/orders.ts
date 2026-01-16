@@ -1,6 +1,44 @@
-import { query } from "./_generated/server";
+import { query, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { requireAdmin } from "./auth";
+
+
+/**
+ * Internal query to find an order by orderId
+ */
+export const findOrder = internalQuery({
+  args: {
+    orderId: v.string(),
+  },
+  returns: v.union(
+    v.object({
+      _id: v.id("orders"),
+      orderId: v.string(),
+      name: v.string(),
+      email: v.string(),
+      totalAmount: v.number(),
+    }),
+    v.null()
+  ),
+  handler: async (ctx, args) => {
+    const order = await ctx.db
+      .query("orders")
+      .withIndex("by_order_id", (q) => q.eq("orderId", args.orderId))
+      .first();
+
+    if (!order) {
+      return null;
+    }
+
+    return {
+      _id: order._id,
+      orderId: order.orderId,
+      name: order.name,
+      email: order.email,
+      totalAmount: order.totalAmount,
+    };
+  },
+});
 
 export const list = query({
   args: {},
@@ -24,10 +62,24 @@ export const list = query({
       ),
       totalAmount: v.number(),
       status: v.union(
-        v.literal("pending"),
         v.literal("completed"),
-        v.literal("cancelled")
+        v.literal("pending"),
+        v.literal("paid"),
+        v.literal("cancelled"),
+        v.literal("expired"),
+        v.literal("failed")
       ),
+      molliePaymentId: v.optional(v.string()),
+      mollieCheckoutUrl: v.optional(v.string()),
+      mollieWebhookUrl: v.optional(v.string()),
+      paymentStatus: v.optional(v.union(
+        v.literal("open"),
+        v.literal("pending"),
+        v.literal("paid"),
+        v.literal("expired"),
+        v.literal("failed"),
+        v.literal("canceled")
+      )),
     })
   ),
   handler: async (ctx) => {
@@ -60,18 +112,95 @@ export const getByOrderId = query({
       ),
       totalAmount: v.number(),
       status: v.union(
-        v.literal("pending"),
         v.literal("completed"),
-        v.literal("cancelled")
+        v.literal("pending"),
+        v.literal("paid"),
+        v.literal("cancelled"),
+        v.literal("expired"),
+        v.literal("failed")
       ),
+      molliePaymentId: v.optional(v.string()),
+      mollieCheckoutUrl: v.optional(v.string()),
+      mollieWebhookUrl: v.optional(v.string()),
+      paymentStatus: v.optional(v.union(
+        v.literal("open"),
+        v.literal("pending"),
+        v.literal("paid"),
+        v.literal("expired"),
+        v.literal("failed"),
+        v.literal("canceled")
+      )),
     }),
     v.null()
   ),
   handler: async (ctx, args) => {
+    await requireAdmin(ctx);
     const order = await ctx.db
       .query("orders")
       .withIndex("by_order_id", (q) => q.eq("orderId", args.orderId))
       .first();
     return order || null;
+  },
+});
+
+/**
+ * Get order by ID and orderId (secure for non-admin users)
+ * Requires both the Convex _id and orderId to prevent enumeration attacks
+ */
+export const getOrderSecure = query({
+  args: { 
+    id: v.id("orders"),
+    orderId: v.string(),
+  },
+  returns: v.union(
+    v.object({
+      _id: v.id("orders"),
+      _creationTime: v.number(),
+      orderId: v.string(),
+      email: v.string(),
+      name: v.string(),
+      comments: v.optional(v.string()),
+      items: v.array(
+        v.object({
+          productId: v.id("products"),
+          productName: v.string(),
+          variantId: v.string(),
+          variantName: v.string(),
+          quantity: v.number(),
+          price: v.number(),
+        })
+      ),
+      totalAmount: v.number(),
+      status: v.union(
+        v.literal("completed"),
+        v.literal("pending"),
+        v.literal("paid"),
+        v.literal("cancelled"),
+        v.literal("expired"),
+        v.literal("failed")
+      ),
+      molliePaymentId: v.optional(v.string()),
+      mollieCheckoutUrl: v.optional(v.string()),
+      mollieWebhookUrl: v.optional(v.string()),
+      paymentStatus: v.optional(v.union(
+        v.literal("open"),
+        v.literal("pending"),
+        v.literal("paid"),
+        v.literal("expired"),
+        v.literal("failed"),
+        v.literal("canceled")
+      )),
+    }),
+    v.null()
+  ),
+  handler: async (ctx, args) => {
+    const order = await ctx.db.get(args.id);
+    
+    // Verify orderId matches to prevent unauthorized access
+    if (!order || order.orderId !== args.orderId) {
+      return null;
+    }
+    
+    return order;
   },
 });

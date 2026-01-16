@@ -1,4 +1,4 @@
-import { mutation } from "./_generated/server";
+import { mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 
@@ -19,8 +19,20 @@ export const processCheckout = mutation({
     success: v.boolean(),
     message: v.string(),
     orderId: v.optional(v.string()),
+    checkoutUrl: v.optional(v.string()),
   }),
   handler: async (ctx, args) => {
+    // Validate quantities are positive integers
+    for (const item of args.items) {
+      const quantity = Math.floor(Math.abs(item.quantity));
+      if (quantity <= 0 || quantity !== item.quantity) {
+        return {
+          success: false,
+          message: `Invalid quantity. Quantity must be a positive integer.`,
+        };
+      }
+    }
+
     // Validate stock availability for all items
     for (const item of args.items) {
       const stock = await ctx.db
@@ -89,36 +101,97 @@ export const processCheckout = mutation({
     }
 
     // Create order record
-    await ctx.db.insert("orders", {
+    const orderDbId = await ctx.db.insert("orders", {
       orderId,
       email: args.email,
       name: args.name,
       comments: args.comments,
       items: orderItems,
       totalAmount,
-      status: "completed",
+      status: "pending",
+      paymentStatus: "open",
     });
-
-    // Decrement stock for all items
-    for (const item of args.items) {
-      const stock = await ctx.db
-        .query("stock")
-        .withIndex("by_product_variant", (q) =>
-          q.eq("productId", item.productId).eq("variantId", item.variantId)
-        )
-        .first();
-
-      if (stock) {
-        await ctx.db.patch(stock._id, {
-          quantity: stock.quantity - item.quantity,
-        });
-      }
-    }
 
     return {
       success: true,
-      message: "Order processed successfully",
+      message: "Order created successfully",
       orderId,
     };
+  },
+});
+
+/**
+ * Update order with payment information (called from action)
+ */
+export const updateOrderPayment = internalMutation({
+  args: {
+    orderId: v.string(),
+    paymentId: v.string(),
+    checkoutUrl: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const order = await ctx.db
+      .query("orders")
+      .withIndex("by_order_id", (q) => q.eq("orderId", args.orderId))
+      .first();
+
+    if (order) {
+      await ctx.db.patch(order._id, {
+        molliePaymentId: args.paymentId,
+        mollieCheckoutUrl: args.checkoutUrl,
+      });
+    }
+
+    return null;
+  },
+});
+
+/**
+ * Complete order payment (called from webhook)
+ */
+export const completeOrderPayment = internalMutation({
+  args: {
+    paymentId: v.string(),
+    status: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Find order by Mollie payment ID
+    const order = await ctx.db
+      .query("orders")
+      .withIndex("by_mollie_payment_id", (q) => q.eq("molliePaymentId", args.paymentId))
+      .first();
+
+    if (!order) {
+      console.error(`Order not found for payment ID: ${args.paymentId}`);
+      return null;
+    }
+
+    // Update payment status
+    await ctx.db.patch(order._id, {
+      paymentStatus: args.status as any,
+      status: args.status === "paid" ? "paid" : order.status,
+    });
+
+    // If payment is successful, decrement stock
+    if (args.status === "paid") {
+      for (const item of order.items) {
+        const stock = await ctx.db
+          .query("stock")
+          .withIndex("by_product_variant", (q) =>
+            q.eq("productId", item.productId).eq("variantId", item.variantId)
+          )
+          .first();
+
+        if (stock) {
+          await ctx.db.patch(stock._id, {
+            quantity: stock.quantity - item.quantity,
+          });
+        }
+      }
+    }
+
+    return null;
   },
 });

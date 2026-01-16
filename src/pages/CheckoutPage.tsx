@@ -1,21 +1,20 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Trash2, CheckCircle, AlertCircle } from "lucide-react";
+import { ArrowLeft, Trash2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCart } from "@/context/CartContext";
 import ReactMarkdown from "react-markdown";
-import { useMutation } from "convex/react";
+import { useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
 export function CheckoutPage() {
-  const { items, totalPrice, removeItem, clearCart, updateAgreement } = useCart();
+  const { items, totalPrice, removeItem, updateAgreement } = useCart();
   const processCheckout = useMutation(api.checkout.processCheckout);
+  const createPayment = useAction(api.payment.createPaymentForOrder);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isComplete, setIsComplete] = useState(false);
-  const [orderId, setOrderId] = useState("");
   const [error, setError] = useState("");
   const [comments, setComments] = useState("");
 
@@ -50,7 +49,7 @@ export function CheckoutPage() {
     setError("");
 
     try {
-      // Process checkout and decrement stock
+      // Step 1: Create order in database
       const result = await processCheckout({
         items: items.map((item) => ({
           productId: item.productId,
@@ -68,39 +67,27 @@ export function CheckoutPage() {
         return;
       }
 
-      // Simulate payment processing
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const createdOrderId = result.orderId || "";
 
-      setOrderId(result.orderId || "");
-      setIsSubmitting(false);
-      setIsComplete(true);
-      clearCart();
+      // Step 2: Create Mollie payment
+      const paymentResult = await createPayment({
+        orderId: createdOrderId,
+      });
+
+      if (!paymentResult.success || !paymentResult.checkoutUrl) {
+        setError(paymentResult.message || "Failed to create payment");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Step 3: Redirect to Mollie payment page
+      window.location.href = paymentResult.checkoutUrl;
     } catch (err) {
+      console.error("Checkout error:", err);
       setError("An error occurred during checkout. Please try again.");
       setIsSubmitting(false);
     }
   };
-
-  if (isComplete) {
-    return (
-      <div className="container mx-auto px-4 py-16">
-        <div className="max-w-md mx-auto text-center">
-          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Order Confirmed!</h1>
-          <p className="text-muted-foreground mb-6">
-            Thank you for your purchase. We've sent a confirmation email to{" "}
-            {formData.email}.
-          </p>
-          <p className="text-sm text-muted-foreground mb-6">
-            Order #{orderId}
-          </p>
-          <Button asChild>
-            <Link to="/">Continue Shopping</Link>
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   if (items.length === 0) {
     return (

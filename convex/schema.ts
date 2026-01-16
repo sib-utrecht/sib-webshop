@@ -47,9 +47,25 @@ export default defineSchema({
     ),
     totalAmount: v.number(),
     status: v.union(
-      v.literal("pending"),
       v.literal("completed"),
-      v.literal("cancelled")
+      v.literal("pending"),
+      v.literal("paid"),
+      v.literal("cancelled"),
+      v.literal("expired"),
+      v.literal("failed")
     ),
-  }).index("by_order_id", ["orderId"]),
+    // Mollie payment metadata
+    molliePaymentId: v.optional(v.string()),
+    mollieCheckoutUrl: v.optional(v.string()),
+    mollieWebhookUrl: v.optional(v.string()),
+    paymentStatus: v.optional(v.union(
+      v.literal("open"),
+      v.literal("pending"),
+      v.literal("paid"),
+      v.literal("expired"),
+      v.literal("failed"),
+      v.literal("canceled")
+    )),
+  }).index("by_order_id", ["orderId"])
+    .index("by_mollie_payment_id", ["molliePaymentId"]),
 });

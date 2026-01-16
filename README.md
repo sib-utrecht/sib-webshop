@@ -1,15 +1,23 @@
 # SIB Webshop
 
-E-commerce platform for SIB-Utrecht built with React, TypeScript, Convex, and AWS Cognito authentication.
+E-commerce platform for SIB-Utrecht built with React, TypeScript, Convex, Mollie payments, and AWS Cognito authentication.
 
 ## Features
 
 - 🛍️ Product catalog with variants (sizes, types, price tiers)
 - 🛒 Shopping cart with persistent state
-- 💳 Checkout process with stock validation
-- 📦 Real-time stock management
+- 💳 Mollie payment integration for secure checkout
+- 📦 Real-time stock management (stock decremented on successful payment)
 - 🔐 Admin authentication with AWS Cognito
 - 📊 Admin dashboard for orders and stock
+- 🔔 Webhook support for payment status updates
+
+## Payment Integration
+
+The webshop uses Mollie for payment processing. Customers are redirected to Mollie's secure checkout page to complete their payment.
+
+**Quick Links:**
+- [Mollie Setup Guide](MOLLIE_SETUP.md) - Complete Mollie integration setup instructions
 
 ## Authentication
 
@@ -26,6 +34,7 @@ Admin pages (Orders and Stock) require authentication. The system uses AWS Cogni
 - Node.js 18+
 - npm or yarn
 - Convex account
+- Mollie account (for payment processing)
 - AWS Cognito User Pool (for admin authentication)
 
 ### Installation
@@ -54,8 +63,12 @@ npx convex dev
 
 5. Set Convex environment variables
 ```bash
+# AWS Cognito for admin auth
 npx convex env set COGNITO_DOMAIN your-cognito-domain
 npx convex env set COGNITO_CLIENT_ID your-client-id
+
+# Mollie for payments (get from https://www.mollie.com/dashboard)
+npx convex env set MOLLIE_API_KEY test_your_api_key_here
 ```
 
 6. Seed the database (optional)
@@ -98,6 +111,7 @@ tsc -b
 
 - **Frontend**: React 19, TypeScript, Tailwind CSS v4
 - **Backend**: Convex (serverless)
+- **Payments**: Mollie
 - **Auth**: AWS Cognito
 - **UI Components**: Shadcn UI
 - **Routing**: React Router v7
