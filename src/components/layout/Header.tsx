@@ -3,13 +3,10 @@ import { ShoppingCart, Store, Package, Box, Edit, LogOut, LogIn } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
-import { CartDrawer } from "@/components/cart/CartDrawer";
-import { useState } from "react";
 
 export function Header() {
   const { totalItems } = useCart();
   const { isAuthenticated, logout } = useAuth();
-  const [cartOpen, setCartOpen] = useState(false);
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -61,7 +58,7 @@ export function Header() {
             variant="outline"
             size="icon"
             className="relative"
-            onClick={() => setCartOpen(true)}
+            onClick={() => navigate("/checkout")}
           >
             <ShoppingCart className="h-5 w-5" />
             {totalItems > 0 && (
@@ -91,8 +88,6 @@ export function Header() {
           )}
         </nav>
       </div>
-
-      <CartDrawer open={cartOpen} onOpenChange={setCartOpen} />
     </header>
   );
 }

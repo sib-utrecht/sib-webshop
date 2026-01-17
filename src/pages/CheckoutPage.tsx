@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Trash2, AlertCircle, Edit } from "lucide-react";
+import { ArrowLeft, Trash2, AlertCircle, Edit, Plus, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +20,7 @@ import { api } from "../../convex/_generated/api";
 import { CustomFieldsEditor } from "@/components/product/CustomFieldsEditor";
 
 export function CheckoutPage() {
-  const { items, totalPrice, removeItem, updateAgreement, updateCustomFieldResponse } = useCart();
+  const { items, totalPrice, removeItem, updateQuantity, updateAgreement, updateCustomFieldResponse } = useCart();
   const processCheckout = useAction(api.checkout.processCheckout);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -155,139 +155,152 @@ export function CheckoutPage() {
           </CardHeader>
           <CardContent>
             <ul className="space-y-4 mb-6">
-              {items.map((item) => (
-                <li key={item.cartItemId} className="flex gap-4">
-                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md bg-muted">
-                    <img
-                      src={item.imageUrl}
-                      alt={item.name}
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">{item.variantName}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Qty: {item.quantity} × €{item.price.toFixed(2)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">
-                      €{(item.price * item.quantity).toFixed(2)}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => removeItem(item.cartItemId)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+              {items.map((item) => {
+                const hasCustomFields = item.customFields && item.customFields.length > 0;
+                const hasAgreements = item.requiredAgreements && item.requiredAgreements.length > 0;
+                const hasResponses = item.customFields?.some(
+                  (field) => item.customFieldResponses?.[field.fieldId]
+                );
+                const allRequiredFilled = item.customFields
+                  ?.filter((field) => field.required)
+                  .every((field) => item.customFieldResponses?.[field.fieldId]);
 
-            {/* Required Agreements */}
-            {itemsWithAgreements.length > 0 && (
-              <div className="mb-6 p-4 border rounded-lg bg-muted/50 space-y-4">
-                <h3 className="font-semibold text-sm">Required Agreements</h3>
-                {itemsWithAgreements.map((item) => (
-                  <div key={item.cartItemId} className="space-y-2">
-                    <p className="text-sm font-medium">
-                      {item.name} - {item.variantName}
-                    </p>
-                    {item.requiredAgreements?.map((agreement, index) => (
-                      <div key={index} className="flex items-start gap-2">
-                        <input
-                          type="checkbox"
-                          id={`checkout-agreement-${item.productId}-${item.variantId}-${index}`}
-                          checked={item.agreedToTerms || false}
-                          onChange={(e) =>
-                            updateAgreement(item.cartItemId, e.target.checked)
-                          }
-                          className="mt-1"
+                return (
+                  <li key={item.cartItemId} className="border-b pb-4 last:border-0">
+                    <div className="flex gap-4">
+                      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md bg-muted">
+                        <img
+                          src={item.imageUrl}
+                          alt={item.name}
+                          className="h-full w-full object-cover"
                         />
-                        <Label
-                          htmlFor={`checkout-agreement-${item.productId}-${item.variantId}-${index}`}
-                          className="text-xs cursor-pointer"
-                        >
-                          <span className="inline">
-                            <ReactMarkdown>{agreement}</ReactMarkdown>
-                          </span>
-                        </Label>
                       </div>
-                    ))}
-                  </div>
-                ))}
-                {!allAgreed && (
-                  <div className="flex items-start gap-2 text-destructive mt-2">
-                    <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                    <p className="text-xs">Please agree to all terms to continue</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Custom Fields - Condensed View */}
-            {itemsWithCustomFields.length > 0 && (
-              <div className="mb-6 p-4 border rounded-lg bg-muted/50 space-y-4">
-                <h3 className="font-semibold text-sm">Additional Information</h3>
-                {itemsWithCustomFields.map((item) => {
-                  const hasResponses = item.customFields?.some(
-                    (field) => item.customFieldResponses?.[field.fieldId]
-                  );
-                  const allRequiredFilled = item.customFields
-                    ?.filter((field) => field.required)
-                    .every((field) => item.customFieldResponses?.[field.fieldId]);
-
-                  return (
-                    <div key={item.cartItemId} className="space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">
-                            {item.name} - {item.variantName}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">{item.variantName}</p>
+                        {/* Quantity controls - only for items without custom fields */}
+                        {!item.customFields || item.customFields.length === 0 ? (
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-sm text-muted-foreground">
+                              {item.quantity} × €{item.price.toFixed(2)}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => updateQuantity(item.cartItemId, item.quantity - 1)}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => updateQuantity(item.cartItemId, item.quantity + 1)}
+                              disabled={item.maxQuantity !== undefined && item.quantity >= item.maxQuantity}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            {item.quantity} × €{item.price.toFixed(2)}
                           </p>
-                          {hasResponses ? (
-                            <div className="mt-2 space-y-1">
-                              {item.customFields?.map((field) => {
-                                const value = item.customFieldResponses?.[field.fieldId];
-                                if (value) {
-                                  return (
-                                    <p key={field.fieldId} className="text-xs text-muted-foreground">
-                                      <span className="font-medium">{field.label}:</span>{" "}
-                                      {value.length > 50 ? value.slice(0, 50) + "..." : value}
-                                    </p>
-                                  );
-                                }
-                                return null;
-                              })}
-                            </div>
-                          ) : (
-                            <p className="text-xs text-muted-foreground mt-1">No information provided</p>
-                          )}
-                        </div>
+                        )}
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="font-medium">
+                          €{(item.price * item.quantity).toFixed(2)}
+                        </span>
                         <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setEditingCustomFields({ cartItemId: item.cartItemId })}
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => removeItem(item.cartItemId)}
                         >
-                          <Edit className="h-3 w-3 mr-1" />
-                          Edit
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                      {!allRequiredFilled && (
-                        <div className="flex items-start gap-2 text-destructive">
-                          <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
-                          <p className="text-xs">Please fill in all required fields</p>
-                        </div>
-                      )}
                     </div>
-                  );
-                })}
-              </div>
-            )}
+
+                    {/* Required Agreements - Inline */}
+                    {hasAgreements && (
+                      <div className="mt-3 ml-20 p-3 border rounded-lg bg-muted/50 space-y-2">
+                        <p className="text-xs font-semibold">Required Agreements</p>
+                        {item.requiredAgreements?.map((agreement, index) => (
+                          <div key={index} className="flex items-start gap-2">
+                            <input
+                              type="checkbox"
+                              id={`checkout-agreement-${item.cartItemId}-${index}`}
+                              checked={item.agreedToTerms || false}
+                              onChange={(e) => updateAgreement(item.cartItemId, e.target.checked)}
+                              className="mt-1"
+                            />
+                            <Label
+                              htmlFor={`checkout-agreement-${item.cartItemId}-${index}`}
+                              className="text-xs cursor-pointer"
+                            >
+                              <span className="inline">
+                                <ReactMarkdown>{agreement}</ReactMarkdown>
+                              </span>
+                            </Label>
+                          </div>
+                        ))}
+                        {!item.agreedToTerms && (
+                          <div className="flex items-start gap-2 text-destructive">
+                            <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                            <p className="text-xs">Please agree to continue</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Custom Fields - Inline */}
+                    {hasCustomFields && (
+                      <div className="mt-3 ml-20 p-3 border rounded-lg bg-muted/50">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <p className="text-xs font-semibold">Additional Information</p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-6 text-xs"
+                            onClick={() => setEditingCustomFields({ cartItemId: item.cartItemId })}
+                          >
+                            <Edit className="h-3 w-3 mr-1" />
+                            Edit
+                          </Button>
+                        </div>
+                        {hasResponses ? (
+                          <div className="space-y-1">
+                            {item.customFields?.map((field) => {
+                              const value = item.customFieldResponses?.[field.fieldId];
+                              if (value) {
+                                return (
+                                  <p key={field.fieldId} className="text-xs text-muted-foreground">
+                                    <span className="font-medium">{field.label}:</span>{" "}
+                                    {value.length > 50 ? value.slice(0, 50) + "..." : value}
+                                  </p>
+                                );
+                              }
+                              return null;
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">No information provided</p>
+                        )}
+                        {!allRequiredFilled && (
+                          <div className="flex items-start gap-2 text-destructive mt-2">
+                            <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                            <p className="text-xs">Please fill in all required fields</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
 
             <div className="border-t pt-4 space-y-2">
               <div className="flex justify-between font-semibold text-lg">
@@ -343,7 +356,7 @@ export function CheckoutPage() {
 
               {hasNonVirtualItems && (
                 <div>
-                  <Label htmlFor="pickupDate">Pickup Date</Label>
+                  <Label htmlFor="pickupDate">Pickup Moment</Label>
                   <Input
                     id="pickupDate"
                     name="pickupDate"
@@ -368,9 +381,6 @@ export function CheckoutPage() {
                   placeholder="Add any special instructions or notes here..."
                   className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  For events: Please include your name and any +1's names
-                </p>
               </div>
 
               <div className="pt-4">
@@ -388,9 +398,6 @@ export function CheckoutPage() {
                 >
                   {isSubmitting ? "Processing..." : `Complete Order - €${totalPrice.toFixed(2)}`}
                 </Button>
-                <p className="text-xs text-muted-foreground text-center mt-2">
-                  This is a mock checkout. No payment will be processed.
-                </p>
               </div>
             </form>
           </CardContent>

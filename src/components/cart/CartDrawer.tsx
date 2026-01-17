@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Minus, Plus, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -17,7 +17,7 @@ interface CartDrawerProps {
 }
 
 export function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
-  const { items, updateQuantity, removeItem, totalPrice } = useCart();
+  const { items, removeItem, totalPrice } = useCart();
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -59,33 +59,7 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                       €{item.price.toFixed(2)}
                     </p>
                     <div className="mt-auto flex items-center gap-2">
-                      {/* Only show quantity controls for items without custom fields (since those don't stack) */}
-                      {!item.customFields || item.customFields.length === 0 ? (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => updateQuantity(item.cartItemId, item.quantity - 1)}
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <span className="w-8 text-center text-sm">
-                            {item.quantity}
-                          </span>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => updateQuantity(item.cartItemId, item.quantity + 1)}
-                            disabled={item.maxQuantity !== undefined && item.quantity >= item.maxQuantity}
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Qty: {item.quantity}</span>
-                      )}
+                      <span className="text-xs text-muted-foreground">Qty: {item.quantity}</span>
                       <Button
                         variant="ghost"
                         size="icon"
