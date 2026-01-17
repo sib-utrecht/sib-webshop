@@ -135,6 +135,7 @@ const orderItemRowValidator = v.object({
   price: v.number(),
   itemTotal: v.number(),
   customFieldResponses: v.optional(v.record(v.string(), v.string())),
+  itemIndex: v.number(),
 });
 
 /**
@@ -163,7 +164,7 @@ export const execute = query({
     
     // Flatten orders into rows (one per cart item)
     const rows = orders.flatMap(order => 
-      order.items.map(item => ({
+      order.items.map((item, itemIndex) => ({
         orderId: order.orderId,
         orderDbId: order._id,
         orderCreationTime: order._creationTime,
@@ -178,6 +179,7 @@ export const execute = query({
         price: item.price,
         itemTotal: item.price * item.quantity,
         customFieldResponses: item.customFieldResponses,
+        itemIndex, // Add index to ensure unique keys when rendering
       }))
     );
     

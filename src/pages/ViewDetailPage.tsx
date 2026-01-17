@@ -31,6 +31,7 @@ interface OrderItemRow {
   price: number;
   itemTotal: number;
   customFieldResponses?: Record<string, string>;
+  itemIndex: number;
 }
 
 export function ViewDetailPage() {
@@ -205,7 +206,7 @@ export function ViewDetailPage() {
             </TableHeader>
             <TableBody>
               {rows.map((row) => (
-                <TableRow key={`${row.orderDbId}-${row.variantId}-${row.productId}`}>
+                <TableRow key={`${row.orderDbId}-${row.itemIndex}`}>
                   {view.columns.map((columnId) => (
                     <TableCell key={columnId}>
                       {getCellValue(row, columnId)}

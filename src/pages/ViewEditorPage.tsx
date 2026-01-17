@@ -49,7 +49,7 @@ export function ViewEditorPage() {
     "variantName",
     "quantity",
   ]);
-  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<Id<"products">[]>([]);
   const [selectedVariantIds, setSelectedVariantIds] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("");
@@ -79,7 +79,7 @@ export function ViewEditorPage() {
     );
   };
 
-  const handleProductToggle = (productId: string) => {
+  const handleProductToggle = (productId: Id<"products">) => {
     setSelectedProductIds((prev) =>
       prev.includes(productId)
         ? prev.filter((id) => id !== productId)
@@ -123,9 +123,7 @@ export function ViewEditorPage() {
         description: description.trim() || undefined,
         columns: selectedColumns,
         filters: {
-          productIds: selectedProductIds.length > 0 
-            ? selectedProductIds.map(id => id as Id<"products">) 
-            : undefined,
+          productIds: selectedProductIds.length > 0 ? selectedProductIds : undefined,
           variantIds: selectedVariantIds.length > 0 ? selectedVariantIds : undefined,
           statuses: selectedStatuses.length > 0 ? selectedStatuses : undefined,
         },
