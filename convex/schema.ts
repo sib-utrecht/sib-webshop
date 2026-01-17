@@ -11,6 +11,7 @@ export default defineSchema({
     gallery: v.array(v.string()),
     isVirtual: v.boolean(),
     isVisible: v.optional(v.boolean()),
+    sortOrder: v.optional(v.number()),
     variants: v.array(
       v.object({
         variantId: v.string(),

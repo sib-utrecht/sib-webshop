@@ -30,6 +30,7 @@ const productValidator = v.object({
   gallery: v.array(v.string()),
   isVirtual: v.boolean(),
   isVisible: v.optional(v.boolean()),
+  sortOrder: v.optional(v.number()),
   variants: v.array(variantValidator),
 });
 
@@ -44,6 +45,7 @@ const productWithStockValidator = v.object({
   gallery: v.array(v.string()),
   isVirtual: v.boolean(),
   isVisible: v.optional(v.boolean()),
+  sortOrder: v.optional(v.number()),
   variants: v.array(variantValidator),
   stock: v.optional(
     v.array(
@@ -66,6 +68,13 @@ export const list = query({
 
     // Filter to only visible products for public users
     const visibleProducts = products.filter(p => p.isVisible !== false);
+
+    // Sort by sortOrder (ascending), with undefined sortOrder at the end
+    visibleProducts.sort((a, b) => {
+      const orderA = a.sortOrder ?? Number.MAX_SAFE_INTEGER;
+      const orderB = b.sortOrder ?? Number.MAX_SAFE_INTEGER;
+      return orderA - orderB;
+    });
 
     // Fetch stock for all products
     const productsWithStock = await Promise.all(
@@ -327,6 +336,13 @@ export const listAll = query({
     
     const products = await ctx.db.query("products").collect();
 
+    // Sort by sortOrder (ascending), with undefined sortOrder at the end
+    products.sort((a, b) => {
+      const orderA = a.sortOrder ?? Number.MAX_SAFE_INTEGER;
+      const orderB = b.sortOrder ?? Number.MAX_SAFE_INTEGER;
+      return orderA - orderB;
+    });
+
     // Fetch stock for all products
     const productsWithStock = await Promise.all(
       products.map(async (product) => {
@@ -374,3 +390,24 @@ export const toggleVisibility = mutation({
   },
 });
 
+/**
+ * Reorder products by updating their sortOrder
+ */
+export const reorderProducts = mutation({
+  args: {
+    productIds: v.array(v.id("products")),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+
+    // Update each product with its new sortOrder based on position in array
+    for (let i = 0; i < args.productIds.length; i++) {
+      await ctx.db.patch(args.productIds[i], {
+        sortOrder: i,
+      });
+    }
+
+    return null;
+  },
+});

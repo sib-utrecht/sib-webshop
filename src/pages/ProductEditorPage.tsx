@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,8 +15,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Package, Edit, Trash2, Plus, X, AlertCircle, Eye, EyeOff } from "lucide-react";
+import { Package, Edit, Trash2, Plus, X, AlertCircle, Eye, EyeOff, GripVertical } from "lucide-react";
 import type { Id } from "../../convex/_generated/dataModel";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 type Variant = {
   variantId: string;
@@ -57,6 +74,125 @@ const emptyProduct: ProductForm = {
   variants: [{ variantId: "default", name: "Default", price: 0 }],
 };
 
+type SortableProductProps = {
+  product: NonNullable<ReturnType<typeof useQuery<typeof api.products.listAll>>>[number];
+  onEdit: (product: any) => void;
+  onDelete: () => void;
+  onToggleVisibility: () => void;
+};
+
+function SortableProduct({
+  product,
+  onEdit,
+  onDelete,
+  onToggleVisibility,
+}: SortableProductProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: product._id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <Card>
+        <CardHeader>
+          <div className="flex items-start gap-2 mb-4">
+            <button
+              className="cursor-grab active:cursor-grabbing mt-1"
+              {...attributes}
+              {...listeners}
+            >
+              <GripVertical className="h-5 w-5 text-muted-foreground" />
+            </button>
+            <div className="flex-1">
+              <div className="h-48 w-full overflow-hidden rounded-md bg-muted">
+                <img
+                  src={product.imageUrl}
+                  alt={product.name}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            </div>
+          </div>
+          <CardTitle className="flex items-start justify-between">
+            <span>{product.name}</span>
+            <div className="flex gap-2">
+              {product.isVirtual && (
+                <Badge variant="secondary" className="ml-2">
+                  Virtual
+                </Badge>
+              )}
+              {product.isVisible === false && (
+                <Badge variant="outline" className="ml-2">
+                  Hidden
+                </Badge>
+              )}
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+            {product.shortDescription || product.description}
+          </p>
+          <div className="mb-4">
+            <p className="text-xs text-muted-foreground mb-1">
+              {product.variants.length} variant
+              {product.variants.length !== 1 ? "s" : ""}
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {product.variants.slice(0, 3).map((variant) => (
+                <Badge key={variant.variantId} variant="outline">
+                  €{variant.price.toFixed(2)}
+                </Badge>
+              ))}
+              {product.variants.length > 3 && (
+                <Badge variant="outline">
+                  +{product.variants.length - 3} more
+                </Badge>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={onToggleVisibility}
+              variant="outline"
+              size="icon"
+              title={product.isVisible === false ? "Show product" : "Hide product"}
+            >
+              {product.isVisible === false ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              onClick={() => onEdit(product)}
+              variant="outline"
+              className="flex-1"
+            >
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
+            <Button onClick={onDelete} variant="destructive">
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export function ProductEditorPage() {
   const products = useQuery(api.products.listAll);
   const createProduct = useMutation(api.products.create);
@@ -64,12 +200,29 @@ export function ProductEditorPage() {
   const deleteProduct = useMutation(api.products.remove);
   const toggleVisibility = useMutation(api.products.toggleVisibility);
   const updateStock = useMutation(api.stock.updateStock);
+  const reorderProducts = useMutation(api.products.reorderProducts);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductForm>(emptyProduct);
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<Id<"products"> | null>(null);
+  const [orderedProducts, setOrderedProducts] = useState<typeof products>([]);
+  const isReorderingRef = useRef(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Update local order when products change (but not during active reordering)
+  useEffect(() => {
+    if (products && !isReorderingRef.current) {
+      setOrderedProducts(products);
+    }
+  }, [products]);
 
   if (products === undefined) {
     return (
@@ -206,6 +359,38 @@ export function ProductEditorPage() {
     }
   };
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!orderedProducts || !over || active.id === over.id) {
+      return;
+    }
+
+    const oldIndex = orderedProducts.findIndex((p) => p._id === active.id);
+    const newIndex = orderedProducts.findIndex((p) => p._id === over.id);
+
+    const newOrder = arrayMove(orderedProducts, oldIndex, newIndex);
+    const previousOrder = orderedProducts;
+    
+    // Optimistically update local state immediately
+    isReorderingRef.current = true;
+    setOrderedProducts(newOrder);
+
+    // Save new order to backend
+    try {
+      await reorderProducts({
+        productIds: newOrder.map((p) => p._id),
+      });
+    } catch (err) {
+      console.error("Failed to reorder products:", err);
+      // Revert on error
+      setOrderedProducts(previousOrder);
+    } finally {
+      // Allow sync from backend again
+      isReorderingRef.current = false;
+    }
+  };
+
   const addVariant = () => {
     setEditingProduct({
       ...editingProduct,
@@ -308,7 +493,7 @@ export function ProductEditorPage() {
         </Button>
       </div>
 
-      {products.length === 0 ? (
+      {!products || products.length === 0 ? (
         <div className="max-w-md mx-auto text-center py-16">
           <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-2">No Products</h2>
@@ -321,87 +506,28 @@ export function ProductEditorPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {products.map((product) => (
-            <Card key={product._id}>
-              <CardHeader>
-                <div className="h-48 w-full overflow-hidden rounded-md bg-muted mb-4">
-                  <img
-                    src={product.imageUrl}
-                    alt={product.name}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <CardTitle className="flex items-start justify-between">
-                  <span>{product.name}</span>
-                  <div className="flex gap-2">
-                    {product.isVirtual && (
-                      <Badge variant="secondary" className="ml-2">
-                        Virtual
-                      </Badge>
-                    )}
-                    {product.isVisible === false && (
-                      <Badge variant="outline" className="ml-2">
-                        Hidden
-                      </Badge>
-                    )}
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                  {product.shortDescription || product.description}
-                </p>
-                <div className="mb-4">
-                  <p className="text-xs text-muted-foreground mb-1">
-                    {product.variants.length} variant
-                    {product.variants.length !== 1 ? "s" : ""}
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {product.variants.slice(0, 3).map((variant) => (
-                      <Badge key={variant.variantId} variant="outline">
-                        €{variant.price.toFixed(2)}
-                      </Badge>
-                    ))}
-                    {product.variants.length > 3 && (
-                      <Badge variant="outline">
-                        +{product.variants.length - 3} more
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => toggleVisibility({ id: product._id })}
-                    variant="outline"
-                    size="icon"
-                    title={product.isVisible === false ? "Show product" : "Hide product"}
-                  >
-                    {product.isVisible === false ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <Button
-                    onClick={() => handleEdit(product)}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
-                  <Button
-                    onClick={() => setDeleteConfirm(product._id)}
-                    variant="destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={orderedProducts?.map((p) => p._id) || []}
+            strategy={rectSortingStrategy}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {orderedProducts?.map((product) => (
+                <SortableProduct
+                  key={product._id}
+                  product={product}
+                  onEdit={handleEdit}
+                  onDelete={() => setDeleteConfirm(product._id)}
+                  onToggleVisibility={() => toggleVisibility({ id: product._id })}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {/* Edit/Create Dialog */}
