@@ -37,6 +37,7 @@ export function CheckoutPage() {
     city: "",
     postalCode: "",
     country: "",
+    pickupDate: "",
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -60,6 +61,7 @@ export function CheckoutPage() {
       return item.customFieldResponses && item.customFieldResponses[field.fieldId]?.trim();
     });
   });
+  const hasNonVirtualItems = items.some((item) => !item.isVirtual);
   const canCheckout = allAgreed && allCustomFieldsFilled;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -78,6 +80,13 @@ export function CheckoutPage() {
       }
 
       // Step 1: Create order in database
+      const orderComments = [
+        formData.pickupDate ? `Pickup: ${formData.pickupDate}` : null,
+        comments || null,
+      ]
+        .filter(Boolean)
+        .join("\n");
+
       const result = await processCheckout({
         items: items.map((item) => ({
           productId: item.productId,
@@ -87,7 +96,7 @@ export function CheckoutPage() {
         })),
         email: formData.email,
         name: `${formData.firstName} ${formData.lastName}`,
-        comments: comments || undefined,
+        comments: orderComments || undefined,
       });
 
       if (!result.success) {
@@ -331,6 +340,23 @@ export function CheckoutPage() {
                   />
                 </div>
               </div>
+
+              {hasNonVirtualItems && (
+                <div>
+                  <Label htmlFor="pickupDate">Pickup Date</Label>
+                  <Input
+                    id="pickupDate"
+                    name="pickupDate"
+                    type="text"
+                    value={formData.pickupDate}
+                    onChange={handleInputChange}
+                    placeholder="e.g., 'next lecture' or 'activity XXX'"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    When do you plan to pick up your items?
+                  </p>
+                </div>
+              )}
 
               <div>
                 <Label htmlFor="comments">Comments (optional)</Label>

@@ -54,24 +54,17 @@ export function ProductPage() {
     (s) => s.variantId === selectedVariantId
   );
 
-  // For items with custom fields, each instance is separate and doesn't stack
-  // So we don't track "isInCart" or show quantity information the same way
-  const selectedVariantHasCustomFields = selectedVariant?.customFields && selectedVariant.customFields.length > 0;
-  
-  const isInCart = !selectedVariantHasCustomFields && items.some(
-    (item) =>
+  const amountInCart = items.reduce((total, item) => {
+    if (
       product &&
       item.productId === product._id &&
       item.variantId === selectedVariantId
-  );
+    ) {
+      return total + item.quantity;
+    }
+    return total;
+  }, 0);
   
-  const cartItem = !selectedVariantHasCustomFields ? items.find(
-    (item) =>
-      product &&
-      item.productId === product._id &&
-      item.variantId === selectedVariantId
-  ) : undefined;
-
   const canAddToCart = () => {
     if (!product || !selectedVariant) return false;
     
@@ -93,7 +86,7 @@ export function ProductPage() {
     }
     
     // Check max quantity
-    if (selectedVariant.maxQuantity && cartItem && cartItem.quantity >= selectedVariant.maxQuantity) {
+    if (selectedVariant.maxQuantity && amountInCart >= selectedVariant.maxQuantity) {
       return false;
     }
     return true;
@@ -115,6 +108,7 @@ export function ProductPage() {
       variantName: selectedVariant.name,
       price: selectedVariant.price,
       imageUrl: product.imageUrl,
+      isVirtual: product.isVirtual,
       maxQuantity: selectedVariant.maxQuantity,
       requiredAgreements: selectedVariant.requiredAgreements,
       customFields: selectedVariant.customFields,
@@ -321,24 +315,39 @@ export function ProductPage() {
 
           {/* Add to Cart */}
           <div className="mt-8 flex flex-col gap-4">
-            <Button
-              size="lg"
-              onClick={handleAddToCart}
-              disabled={!canAddToCart()}
-              className="w-full sm:w-auto"
-            >
-              {justAdded ? (
-                <>
-                  <Check className="mr-2 h-5 w-5" />
-                  Added to Cart!
-                </>
-              ) : (
-                <>
-                  <ShoppingCart className="mr-2 h-5 w-5" />
-                  Add to Cart
-                </>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button
+                size="lg"
+                onClick={handleAddToCart}
+                disabled={!canAddToCart()}
+                className="flex-1"
+              >
+                {justAdded ? (
+                  <>
+                    <Check className="mr-2 h-5 w-5" />
+                    Added to Cart!
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart className="mr-2 h-5 w-5" />
+                    Add to Cart
+                  </>
+                )}
+              </Button>
+              
+              {items.length > 0 && (
+                <Button
+                  size="lg"
+                  variant="outline"
+                  asChild
+                  className="flex-1"
+                >
+                  <Link to="/checkout">
+                    Go to Cart
+                  </Link>
+                </Button>
               )}
-            </Button>
+            </div>
 
             {!canAddToCart() && selectedVariant?.requiredAgreements && !agreedToTerms && (
               <p className="text-sm text-destructive">
@@ -352,13 +361,13 @@ export function ProductPage() {
               </p>
             )}
 
-            {isInCart && !justAdded && (
+            {amountInCart > 0 && (
               <p className="text-sm text-muted-foreground">
-                You have {cartItem?.quantity} in your cart
+                You have {amountInCart} in your cart
               </p>
             )}
 
-            {selectedVariant?.maxQuantity && cartItem && cartItem.quantity >= selectedVariant.maxQuantity && (
+            {selectedVariant?.maxQuantity && amountInCart >= selectedVariant.maxQuantity && (
               <p className="text-sm text-orange-600">
                 Maximum quantity reached for this option
               </p>

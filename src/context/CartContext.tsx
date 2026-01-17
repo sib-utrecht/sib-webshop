@@ -9,6 +9,7 @@ export interface CartItem {
   variantName: string;
   price: number;
   imageUrl: string;
+  isVirtual: boolean;
   quantity: number;
   maxQuantity?: number;
   requiredAgreements?: string[];
