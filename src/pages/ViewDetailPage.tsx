@@ -108,8 +108,9 @@ export function ViewDetailPage() {
           </Badge>
         );
       case "price":
+        return `€${row.price.toFixed(2)}`;
       case "itemTotal":
-        return `€${row[columnId].toFixed(2)}`;
+        return `€${row.itemTotal.toFixed(2)}`;
       default:
         return row[columnId] ?? "-";
     }
