@@ -1,7 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { requireAdmin } from "./auth";
-import { Doc, Id } from "./_generated/dataModel";
 
 // Validator for view filters
 const viewFiltersValidator = v.optional(v.object({
