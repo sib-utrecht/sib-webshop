@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { ShoppingCart, Store, Package, Box, LogOut, LogIn } from "lucide-react";
+import { ShoppingCart, Store, Package, Box, Edit, LogOut, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
@@ -47,6 +47,13 @@ export function Header() {
               >
                 <Box className="h-4 w-4" />
                 Stock
+              </Link>
+              <Link
+                to="/products/edit"
+                className="text-sm font-medium transition-colors hover:text-primary flex items-center gap-1"
+              >
+                <Edit className="h-4 w-4" />
+                Edit Products
               </Link>
             </>
           )}

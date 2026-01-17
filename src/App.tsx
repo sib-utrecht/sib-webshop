@@ -6,6 +6,7 @@ import { CheckoutPage } from "@/pages/CheckoutPage";
 import { CheckoutSuccessPage } from "@/pages/CheckoutSuccessPage";
 import { OrdersPage } from "@/pages/OrdersPage";
 import { StockOverviewPage } from "@/pages/StockOverviewPage";
+import { ProductEditorPage } from "@/pages/ProductEditorPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { DebugPage } from "@/pages/DebugPage";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -34,6 +35,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <StockOverviewPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/products/edit"
+            element={
+              <ProtectedRoute>
+                <ProductEditorPage />
               </ProtectedRoute>
             }
           />

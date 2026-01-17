@@ -1,5 +1,6 @@
-import { query } from "./_generated/server";
+import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { requireAdmin } from "./auth";
 
 const variantValidator = v.object({
   variantId: v.string(),
@@ -95,3 +96,180 @@ export const getByProductId = query({
       .first();
   },
 });
+
+export const create = mutation({
+  args: {
+    productId: v.string(),
+    name: v.string(),
+    description: v.union(v.string(), v.null()),
+    shortDescription: v.optional(v.string()),
+    imageUrl: v.string(),
+    gallery: v.array(v.string()),
+    isVirtual: v.boolean(),
+    variants: v.array(
+      v.object({
+        variantId: v.string(),
+        name: v.string(),
+        price: v.number(),
+        maxQuantity: v.optional(v.number()),
+        requiredAgreements: v.optional(v.array(v.string())),
+      })
+    ),
+  },
+  returns: v.id("products"),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+
+    // Check if productId already exists
+    const existing = await ctx.db
+      .query("products")
+      .withIndex("by_product_id", (q) => q.eq("productId", args.productId))
+      .first();
+
+    if (existing) {
+      throw new Error("Product ID already exists");
+    }
+
+    const productId = await ctx.db.insert("products", {
+      productId: args.productId,
+      name: args.name,
+      description: args.description,
+      shortDescription: args.shortDescription,
+      imageUrl: args.imageUrl,
+      gallery: args.gallery,
+      isVirtual: args.isVirtual,
+      variants: args.variants,
+    });
+
+    // Initialize stock for each variant
+    for (const variant of args.variants) {
+      await ctx.db.insert("stock", {
+        productId,
+        variantId: variant.variantId,
+        quantity: 0,
+        reserved: 0,
+      });
+    }
+
+    return productId;
+  },
+});
+
+export const update = mutation({
+  args: {
+    id: v.id("products"),
+    productId: v.string(),
+    name: v.string(),
+    description: v.union(v.string(), v.null()),
+    shortDescription: v.optional(v.string()),
+    imageUrl: v.string(),
+    gallery: v.array(v.string()),
+    isVirtual: v.boolean(),
+    variants: v.array(
+      v.object({
+        variantId: v.string(),
+        name: v.string(),
+        price: v.number(),
+        maxQuantity: v.optional(v.number()),
+        requiredAgreements: v.optional(v.array(v.string())),
+      })
+    ),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+
+    const product = await ctx.db.get(args.id);
+    if (!product) {
+      throw new Error("Product not found");
+    }
+
+    // Check if productId is being changed and if new one already exists
+    if (product.productId !== args.productId) {
+      const existing = await ctx.db
+        .query("products")
+        .withIndex("by_product_id", (q) => q.eq("productId", args.productId))
+        .first();
+
+      if (existing && existing._id !== args.id) {
+        throw new Error("Product ID already exists");
+      }
+    }
+
+    // Update the product
+    await ctx.db.patch(args.id, {
+      productId: args.productId,
+      name: args.name,
+      description: args.description,
+      shortDescription: args.shortDescription,
+      imageUrl: args.imageUrl,
+      gallery: args.gallery,
+      isVirtual: args.isVirtual,
+      variants: args.variants,
+    });
+
+    // Get existing stock entries
+    const existingStocks = await ctx.db
+      .query("stock")
+      .withIndex("by_product", (q) => q.eq("productId", args.id))
+      .collect();
+
+    // Create a map of existing stock by variantId
+    const stockMap = new Map(
+      existingStocks.map((stock) => [stock.variantId, stock])
+    );
+
+    // Update or create stock for each variant
+    for (const variant of args.variants) {
+      const existingStock = stockMap.get(variant.variantId);
+      if (existingStock) {
+        // Variant already has stock entry, keep it
+        stockMap.delete(variant.variantId);
+      } else {
+        // New variant, create stock entry
+        await ctx.db.insert("stock", {
+          productId: args.id,
+          variantId: variant.variantId,
+          quantity: 0,
+          reserved: 0,
+        });
+      }
+    }
+
+    // Remove stock entries for deleted variants
+    for (const [, stock] of stockMap) {
+      await ctx.db.delete(stock._id);
+    }
+
+    return null;
+  },
+});
+
+export const remove = mutation({
+  args: { id: v.id("products") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+
+    const product = await ctx.db.get(args.id);
+    if (!product) {
+      throw new Error("Product not found");
+    }
+
+    // Delete all stock entries for this product
+    const stocks = await ctx.db
+      .query("stock")
+      .withIndex("by_product", (q) => q.eq("productId", args.id))
+      .collect();
+
+    for (const stock of stocks) {
+      await ctx.db.delete(stock._id);
+    }
+
+    // Delete the product
+    await ctx.db.delete(args.id);
+
+    return null;
+  },
+});
+
