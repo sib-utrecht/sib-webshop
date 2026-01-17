@@ -2,6 +2,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Shield, User, Clock, Key } from "lucide-react";
+import { formatUnixTimestamp } from "@/lib/utils";
 
 export function DebugPage() {
   const { token, isAuthenticated } = useAuth();
@@ -56,18 +57,6 @@ export function DebugPage() {
   }
 
   const { header, payload } = decoded;
-
-  // Format timestamp
-  const formatTimestamp = (timestamp: number) => {
-    const date = new Date(timestamp * 1000);
-    const day = date.getDate();
-    const month = date.toLocaleString('en-US', { month: 'short' });
-    const year = date.getFullYear();
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-    return `${day} ${month} ${year}, ${hours}:${minutes}:${seconds}`;
-  };
 
   // Check if token is expired
   const isExpired = payload.exp && Date.now() / 1000 > payload.exp;
@@ -154,21 +143,21 @@ export function DebugPage() {
                 {payload.iat && (
                   <div>
                     <div className="text-sm font-medium text-muted-foreground">Issued At (iat)</div>
-                    <div className="text-sm">{formatTimestamp(payload.iat)}</div>
+                    <div className="text-sm">{formatUnixTimestamp(payload.iat)}</div>
                     <div className="text-xs text-muted-foreground">{payload.iat}</div>
                   </div>
                 )}
                 {payload.exp && (
                   <div>
                     <div className="text-sm font-medium text-muted-foreground">Expires (exp)</div>
-                    <div className="text-sm">{formatTimestamp(payload.exp)}</div>
+                    <div className="text-sm">{formatUnixTimestamp(payload.exp)}</div>
                     <div className="text-xs text-muted-foreground">{payload.exp}</div>
                   </div>
                 )}
                 {payload.auth_time && (
                   <div>
                     <div className="text-sm font-medium text-muted-foreground">Auth Time</div>
-                    <div className="text-sm">{formatTimestamp(payload.auth_time)}</div>
+                    <div className="text-sm">{formatUnixTimestamp(payload.auth_time)}</div>
                     <div className="text-xs text-muted-foreground">{payload.auth_time}</div>
                   </div>
                 )}

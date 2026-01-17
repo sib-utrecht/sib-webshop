@@ -3,6 +3,7 @@ import { api } from "../../convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Package, User, Mail, Calendar } from "lucide-react";
+import { formatDateTime } from "@/lib/utils";
 
 export function OrdersPage() {
   const orders = useQuery(api.orders.list);
@@ -43,13 +44,7 @@ export function OrdersPage() {
                   <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
                     <div className="flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
-                      {new Date(order._creationTime).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatDateTime(order._creationTime)}
                     </div>
                   </div>
                 </div>
