@@ -231,7 +231,10 @@ export const seed = internalMutation({
 
     // Insert all mock products and initialize stock
     for (const product of mockProducts) {
-      const productId: Id<"products"> = await ctx.db.insert("products", product);
+      const productId: Id<"products"> = await ctx.db.insert("products", {
+        ...product,
+        isVisible: true,
+      });
       
       // Initialize stock for each variant
       for (const variant of product.variants) {

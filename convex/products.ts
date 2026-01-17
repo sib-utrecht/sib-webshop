@@ -20,6 +20,7 @@ const productValidator = v.object({
   imageUrl: v.string(),
   gallery: v.array(v.string()),
   isVirtual: v.boolean(),
+  isVisible: v.optional(v.boolean()),
   variants: v.array(variantValidator),
 });
 
@@ -33,6 +34,7 @@ const productWithStockValidator = v.object({
   imageUrl: v.string(),
   gallery: v.array(v.string()),
   isVirtual: v.boolean(),
+  isVisible: v.optional(v.boolean()),
   variants: v.array(variantValidator),
   stock: v.optional(
     v.array(
@@ -53,9 +55,12 @@ export const list = query({
   handler: async (ctx) => {
     const products = await ctx.db.query("products").collect();
 
+    // Filter to only visible products for public users
+    const visibleProducts = products.filter(p => p.isVisible !== false);
+
     // Fetch stock for all products
     const productsWithStock = await Promise.all(
-      products.map(async (product) => {
+      visibleProducts.map(async (product) => {
         const stocks = await ctx.db
           .query("stock")
           .withIndex("by_product", (q) => q.eq("productId", product._id))
@@ -90,10 +95,17 @@ export const getByProductId = query({
   args: { productId: v.string() },
   returns: v.union(productValidator, v.null()),
   handler: async (ctx, args) => {
-    return await ctx.db
+    const product = await ctx.db
       .query("products")
       .withIndex("by_product_id", (q) => q.eq("productId", args.productId))
       .first();
+    
+    // Filter out hidden products for public users
+    if (product && product.isVisible === false) {
+      return null;
+    }
+    
+    return product;
   },
 });
 
@@ -106,6 +118,7 @@ export const create = mutation({
     imageUrl: v.string(),
     gallery: v.array(v.string()),
     isVirtual: v.boolean(),
+    isVisible: v.optional(v.boolean()),
     variants: v.array(
       v.object({
         variantId: v.string(),
@@ -138,6 +151,7 @@ export const create = mutation({
       imageUrl: args.imageUrl,
       gallery: args.gallery,
       isVirtual: args.isVirtual,
+      isVisible: args.isVisible ?? true,
       variants: args.variants,
     });
 
@@ -165,6 +179,7 @@ export const update = mutation({
     imageUrl: v.string(),
     gallery: v.array(v.string()),
     isVirtual: v.boolean(),
+    isVisible: v.optional(v.boolean()),
     variants: v.array(
       v.object({
         variantId: v.string(),
@@ -205,6 +220,7 @@ export const update = mutation({
       imageUrl: args.imageUrl,
       gallery: args.gallery,
       isVirtual: args.isVirtual,
+      isVisible: args.isVisible,
       variants: args.variants,
     });
 
@@ -268,6 +284,64 @@ export const remove = mutation({
 
     // Delete the product
     await ctx.db.delete(args.id);
+
+    return null;
+  },
+});
+
+/**
+ * Admin-only query to list all products (including hidden ones)
+ */
+export const listAll = query({
+  args: {},
+  returns: v.array(productWithStockValidator),
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    
+    const products = await ctx.db.query("products").collect();
+
+    // Fetch stock for all products
+    const productsWithStock = await Promise.all(
+      products.map(async (product) => {
+        const stocks = await ctx.db
+          .query("stock")
+          .withIndex("by_product", (q) => q.eq("productId", product._id))
+          .collect();
+
+        return {
+          ...product,
+          stock: stocks.map((stock) => ({
+            _id: stock._id,
+            variantId: stock.variantId,
+            quantity: stock.quantity,
+            reserved: stock.reserved,
+            available: stock.quantity - stock.reserved,
+          })),
+        };
+      })
+    );
+
+    return productsWithStock;
+  },
+});
+
+/**
+ * Toggle product visibility
+ */
+export const toggleVisibility = mutation({
+  args: { id: v.id("products") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+
+    const product = await ctx.db.get(args.id);
+    if (!product) {
+      throw new Error("Product not found");
+    }
+
+    await ctx.db.patch(args.id, {
+      isVisible: product.isVisible === false ? true : false,
+    });
 
     return null;
   },

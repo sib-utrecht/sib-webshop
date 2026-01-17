@@ -9,7 +9,7 @@ import { Package, Edit, Check, X, AlertCircle } from "lucide-react";
 import type { Id } from "../../convex/_generated/dataModel";
 
 export function StockOverviewPage() {
-  const products = useQuery(api.products.list);
+  const products = useQuery(api.products.listAll);
   const updateStock = useMutation(api.stock.updateStock);
   const [editingStock, setEditingStock] = useState<{
     productId: Id<"products">;
@@ -94,12 +94,15 @@ export function StockOverviewPage() {
                       className="h-full w-full object-cover"
                     />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <CardTitle>{product.name}</CardTitle>
                     <p className="text-sm text-muted-foreground mt-1">
                       {product.variants.length} variant{product.variants.length !== 1 ? "s" : ""}
                     </p>
                   </div>
+                  {product.isVisible === false && (
+                    <Badge variant="outline">Hidden</Badge>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>

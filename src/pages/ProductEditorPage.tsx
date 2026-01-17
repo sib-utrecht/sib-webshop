@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Package, Edit, Trash2, Plus, X, AlertCircle } from "lucide-react";
+import { Package, Edit, Trash2, Plus, X, AlertCircle, Eye, EyeOff } from "lucide-react";
 import type { Id } from "../../convex/_generated/dataModel";
 
 type Variant = {
@@ -51,10 +51,11 @@ const emptyProduct: ProductForm = {
 };
 
 export function ProductEditorPage() {
-  const products = useQuery(api.products.list);
+  const products = useQuery(api.products.listAll);
   const createProduct = useMutation(api.products.create);
   const updateProduct = useMutation(api.products.update);
   const deleteProduct = useMutation(api.products.remove);
+  const toggleVisibility = useMutation(api.products.toggleVisibility);
   const updateStock = useMutation(api.stock.updateStock);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -282,11 +283,18 @@ export function ProductEditorPage() {
                 </div>
                 <CardTitle className="flex items-start justify-between">
                   <span>{product.name}</span>
-                  {product.isVirtual && (
-                    <Badge variant="secondary" className="ml-2">
-                      Virtual
-                    </Badge>
-                  )}
+                  <div className="flex gap-2">
+                    {product.isVirtual && (
+                      <Badge variant="secondary" className="ml-2">
+                        Virtual
+                      </Badge>
+                    )}
+                    {product.isVisible === false && (
+                      <Badge variant="outline" className="ml-2">
+                        Hidden
+                      </Badge>
+                    )}
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -312,6 +320,18 @@ export function ProductEditorPage() {
                   </div>
                 </div>
                 <div className="flex gap-2">
+                  <Button
+                    onClick={() => toggleVisibility({ id: product._id })}
+                    variant="outline"
+                    size="icon"
+                    title={product.isVisible === false ? "Show product" : "Hide product"}
+                  >
+                    {product.isVisible === false ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
                   <Button
                     onClick={() => handleEdit(product)}
                     variant="outline"

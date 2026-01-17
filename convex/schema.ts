@@ -10,6 +10,7 @@ export default defineSchema({
     imageUrl: v.string(),
     gallery: v.array(v.string()),
     isVirtual: v.boolean(),
+    isVisible: v.optional(v.boolean()),
     variants: v.array(
       v.object({
         variantId: v.string(),
