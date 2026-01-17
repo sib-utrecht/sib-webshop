@@ -9,6 +9,9 @@ import { StockOverviewPage } from "@/pages/StockOverviewPage";
 import { ProductEditorPage } from "@/pages/ProductEditorPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { DebugPage } from "@/pages/DebugPage";
+import { ViewsListPage } from "@/pages/ViewsListPage";
+import { ViewDetailPage } from "@/pages/ViewDetailPage";
+import { ViewEditorPage } from "@/pages/ViewEditorPage";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 function App() {
@@ -43,6 +46,38 @@ function App() {
             element={
               <ProtectedRoute>
                 <ProductEditorPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/views"
+            element={
+              <ProtectedRoute>
+                <ViewsListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/views/new"
+            element={
+              <ProtectedRoute>
+                <ViewEditorPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/views/:viewId"
+            element={
+              <ProtectedRoute>
+                <ViewDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/views/:viewId/edit"
+            element={
+              <ProtectedRoute>
+                <ViewEditorPage />
               </ProtectedRoute>
             }
           />

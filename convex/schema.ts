@@ -80,4 +80,17 @@ export default defineSchema({
     )),
   }).index("by_order_id", ["orderId"])
     .index("by_mollie_payment_id", ["molliePaymentId"]),
+
+  views: defineTable({
+    name: v.string(),
+    description: v.optional(v.string()),
+    columns: v.array(v.string()), // Column IDs to display (e.g., ["email", "productName", "variantName", "customField_fieldId"])
+    filters: v.optional(v.object({
+      productIds: v.optional(v.array(v.id("products"))),
+      variantIds: v.optional(v.array(v.string())),
+      statuses: v.optional(v.array(v.string())),
+    })),
+    sortBy: v.optional(v.string()), // Column ID to sort by
+    sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
+  }).index("by_name", ["name"]),
 });
