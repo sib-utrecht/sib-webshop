@@ -15,6 +15,24 @@ import {
 import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
+// Type for flattened order item row (matching the validator in convex/views.ts)
+interface OrderItemRow {
+  orderId: string;
+  orderDbId: Id<"orders">;
+  orderCreationTime: number;
+  email: string;
+  name: string;
+  orderStatus: string;
+  productId: Id<"products">;
+  productName: string;
+  variantId: string;
+  variantName: string;
+  quantity: number;
+  price: number;
+  itemTotal: number;
+  customFieldResponses?: Record<string, string>;
+}
+
 export function ViewDetailPage() {
   const { viewId } = useParams<{ viewId: string }>();
   const navigate = useNavigate();
@@ -65,7 +83,7 @@ export function ViewDetailPage() {
   };
 
   // Helper to get cell value
-  const getCellValue = (row: any, columnId: string): React.ReactNode => {
+  const getCellValue = (row: OrderItemRow, columnId: string): React.ReactNode => {
     if (columnId.startsWith("customField_")) {
       const fieldId = columnId.substring("customField_".length);
       return row.customFieldResponses?.[fieldId] || "-";
@@ -186,8 +204,8 @@ export function ViewDetailPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row, index) => (
-                <TableRow key={`${row.orderDbId}-${index}`}>
+              {rows.map((row) => (
+                <TableRow key={`${row.orderDbId}-${row.variantId}-${row.productId}`}>
                   {view.columns.map((columnId) => (
                     <TableCell key={columnId}>
                       {getCellValue(row, columnId)}

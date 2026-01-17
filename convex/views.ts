@@ -198,8 +198,8 @@ export const execute = query({
     if (view.sortBy) {
       const sortOrder = view.sortOrder || "asc";
       filteredRows.sort((a, b) => {
-        let aValue: any;
-        let bValue: any;
+        let aValue: string | number;
+        let bValue: string | number;
         
         // Get values based on sort column
         switch (view.sortBy) {

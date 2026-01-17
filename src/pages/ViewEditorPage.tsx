@@ -63,7 +63,7 @@ export function ViewEditorPage() {
       setName(existingView.name);
       setDescription(existingView.description || "");
       setSelectedColumns(existingView.columns);
-      setSelectedProductIds(existingView.filters?.productIds?.map(id => id) || []);
+      setSelectedProductIds(existingView.filters?.productIds || []);
       setSelectedVariantIds(existingView.filters?.variantIds || []);
       setSelectedStatuses(existingView.filters?.statuses || []);
       setSortBy(existingView.sortBy || "");
