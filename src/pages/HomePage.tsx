@@ -8,9 +8,9 @@ export function HomePage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Our Products</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Merch & more</h1>
         <p className="mt-2 text-muted-foreground">
-          Discover our curated collection of premium products
+          Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
         </p>
       </div>
 

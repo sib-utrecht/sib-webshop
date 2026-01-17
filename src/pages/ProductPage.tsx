@@ -316,8 +316,8 @@ export function ProductPage() {
             <div className="mt-auto pt-8 border-t">
               <h2 className="font-semibold mb-2">Product Details</h2>
               <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Physical product</li>
-                <li>• Collect at GMA or activity</li>
+                <li>• This item should be picked up at an activity.</li>
+                <li>• Contact the board to arrange the pickup.</li>
               </ul>
             </div>
           )}

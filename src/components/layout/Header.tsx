@@ -22,7 +22,7 @@ export function Header() {
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link to="/" className="flex items-center gap-2 font-semibold text-lg">
           <Store className="h-6 w-6" />
-          <span>SIB-Utrecht webshop</span>
+          <span>SIB-Utrecht</span>
         </Link>
 
         <nav className="flex items-center gap-6">
