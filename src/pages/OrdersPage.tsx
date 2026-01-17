@@ -4,9 +4,34 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Package, User, Mail, Calendar } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
+import { useMemo } from "react";
 
 export function OrdersPage() {
   const orders = useQuery(api.orders.list);
+  const products = useQuery(api.products.listAll);
+
+  // Create a lookup map for custom field labels
+  const customFieldLabels = useMemo(() => {
+    if (!products) return new Map();
+    
+    const map = new Map<string, Map<string, string>>(); // productId -> (fieldId -> label)
+    
+    products.forEach(product => {
+      product.variants.forEach(variant => {
+        if (variant.customFields) {
+          const fieldMap = new Map<string, string>();
+          variant.customFields.forEach(field => {
+            fieldMap.set(field.fieldId, field.label);
+          });
+          // Store by variant's custom fields signature since we don't store variant info in order
+          const key = `${product._id}-${variant.variantId}`;
+          map.set(key, fieldMap);
+        }
+      });
+    });
+    
+    return map;
+  }, [products]);
 
   if (orders === undefined) {
     return (
@@ -86,18 +111,37 @@ export function OrdersPage() {
                 {/* Order Items */}
                 <div className="space-y-3">
                   <h3 className="font-semibold text-sm">Order Items</h3>
-                  <ul className="space-y-2">
+                  <ul className="space-y-3">
                     {order.items.map((item, index) => (
-                      <li key={index} className="flex justify-between text-sm">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{item.productName}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {item.variantName} × {item.quantity}
-                          </p>
+                      <li key={index} className="space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{item.productName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {item.variantName} × {item.quantity}
+                            </p>
+                          </div>
+                          <span className="font-medium ml-2">
+                            €{(item.price * item.quantity).toFixed(2)}
+                          </span>
                         </div>
-                        <span className="font-medium ml-2">
-                          €{(item.price * item.quantity).toFixed(2)}
-                        </span>
+                        {/* Custom Field Responses */}
+                        {item.customFieldResponses && Object.keys(item.customFieldResponses).length > 0 && (
+                          <div className="ml-4 mt-1 p-2 bg-muted/50 rounded text-xs space-y-1">
+                            {Object.entries(item.customFieldResponses).map(([fieldId, value]) => {
+                              // Look up the field label
+                              const fieldMap = customFieldLabels.get(`${item.productId}-${item.variantId}`);
+                              const label = fieldMap?.get(fieldId) || fieldId;
+                              
+                              return (
+                                <div key={fieldId}>
+                                  <span className="font-medium">{label}:</span>{" "}
+                                  <span className="text-muted-foreground">{value}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>

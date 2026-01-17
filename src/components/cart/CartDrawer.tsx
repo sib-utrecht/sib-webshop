@@ -42,7 +42,7 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
             <ul className="space-y-4">
               {items.map((item) => (
                 <li
-                  key={`${item.productId}-${item.variantId}`}
+                  key={item.cartItemId}
                   className="flex gap-4 border-b pb-4 last:border-0"
                 >
                   <div className="h-20 w-20 shrink-0 overflow-hidden rounded-md bg-muted">
@@ -59,35 +59,38 @@ export function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                       €{item.price.toFixed(2)}
                     </p>
                     <div className="mt-auto flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() =>
-                          updateQuantity(item.productId, item.variantId, item.quantity - 1)
-                        }
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <span className="w-8 text-center text-sm">
-                        {item.quantity}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() =>
-                          updateQuantity(item.productId, item.variantId, item.quantity + 1)
-                        }
-                        disabled={item.maxQuantity !== undefined && item.quantity >= item.maxQuantity}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
+                      {/* Only show quantity controls for items without custom fields (since those don't stack) */}
+                      {!item.customFields || item.customFields.length === 0 ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => updateQuantity(item.cartItemId, item.quantity - 1)}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <span className="w-8 text-center text-sm">
+                            {item.quantity}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => updateQuantity(item.cartItemId, item.quantity + 1)}
+                            disabled={item.maxQuantity !== undefined && item.quantity >= item.maxQuantity}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Qty: {item.quantity}</span>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 ml-auto text-destructive hover:text-destructive"
-                        onClick={() => removeItem(item.productId, item.variantId)}
+                        onClick={() => removeItem(item.cartItemId)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

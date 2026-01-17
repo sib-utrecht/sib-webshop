@@ -1,21 +1,33 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Trash2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Trash2, AlertCircle, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useCart } from "@/context/CartContext";
 import ReactMarkdown from "react-markdown";
 import { useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { CustomFieldsEditor } from "@/components/product/CustomFieldsEditor";
 
 export function CheckoutPage() {
-  const { items, totalPrice, removeItem, updateAgreement } = useCart();
+  const { items, totalPrice, removeItem, updateAgreement, updateCustomFieldResponse } = useCart();
   const processCheckout = useAction(api.checkout.processCheckout);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [comments, setComments] = useState("");
+  const [editingCustomFields, setEditingCustomFields] = useState<{
+    cartItemId: string;
+  } | null>(null);
 
   const [formData, setFormData] = useState({
     email: "",
@@ -37,8 +49,18 @@ export function CheckoutPage() {
   const itemsWithAgreements = items.filter(
     (item) => item.requiredAgreements && item.requiredAgreements.length > 0
   );
+  const itemsWithCustomFields = items.filter(
+    (item) => item.customFields && item.customFields.length > 0
+  );
   const allAgreed = itemsWithAgreements.every((item) => item.agreedToTerms);
-  const canCheckout = allAgreed;
+  const allCustomFieldsFilled = itemsWithCustomFields.every((item) => {
+    if (!item.customFields) return true;
+    return item.customFields.every((field) => {
+      if (!field.required) return true;
+      return item.customFieldResponses && item.customFieldResponses[field.fieldId]?.trim();
+    });
+  });
+  const canCheckout = allAgreed && allCustomFieldsFilled;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +83,7 @@ export function CheckoutPage() {
           productId: item.productId,
           variantId: item.variantId,
           quantity: item.quantity,
+          customFieldResponses: item.customFieldResponses,
         })),
         email: formData.email,
         name: `${formData.firstName} ${formData.lastName}`,
@@ -124,7 +147,7 @@ export function CheckoutPage() {
           <CardContent>
             <ul className="space-y-4 mb-6">
               {items.map((item) => (
-                <li key={`${item.productId}-${item.variantId}`} className="flex gap-4">
+                <li key={item.cartItemId} className="flex gap-4">
                   <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md bg-muted">
                     <img
                       src={item.imageUrl}
@@ -147,7 +170,7 @@ export function CheckoutPage() {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => removeItem(item.productId, item.variantId)}
+                      onClick={() => removeItem(item.cartItemId)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -161,7 +184,7 @@ export function CheckoutPage() {
               <div className="mb-6 p-4 border rounded-lg bg-muted/50 space-y-4">
                 <h3 className="font-semibold text-sm">Required Agreements</h3>
                 {itemsWithAgreements.map((item) => (
-                  <div key={`${item.productId}-${item.variantId}`} className="space-y-2">
+                  <div key={item.cartItemId} className="space-y-2">
                     <p className="text-sm font-medium">
                       {item.name} - {item.variantName}
                     </p>
@@ -172,7 +195,7 @@ export function CheckoutPage() {
                           id={`checkout-agreement-${item.productId}-${item.variantId}-${index}`}
                           checked={item.agreedToTerms || false}
                           onChange={(e) =>
-                            updateAgreement(item.productId, item.variantId, e.target.checked)
+                            updateAgreement(item.cartItemId, e.target.checked)
                           }
                           className="mt-1"
                         />
@@ -194,6 +217,66 @@ export function CheckoutPage() {
                     <p className="text-xs">Please agree to all terms to continue</p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Custom Fields - Condensed View */}
+            {itemsWithCustomFields.length > 0 && (
+              <div className="mb-6 p-4 border rounded-lg bg-muted/50 space-y-4">
+                <h3 className="font-semibold text-sm">Additional Information</h3>
+                {itemsWithCustomFields.map((item) => {
+                  const hasResponses = item.customFields?.some(
+                    (field) => item.customFieldResponses?.[field.fieldId]
+                  );
+                  const allRequiredFilled = item.customFields
+                    ?.filter((field) => field.required)
+                    .every((field) => item.customFieldResponses?.[field.fieldId]);
+
+                  return (
+                    <div key={item.cartItemId} className="space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">
+                            {item.name} - {item.variantName}
+                          </p>
+                          {hasResponses ? (
+                            <div className="mt-2 space-y-1">
+                              {item.customFields?.map((field) => {
+                                const value = item.customFieldResponses?.[field.fieldId];
+                                if (value) {
+                                  return (
+                                    <p key={field.fieldId} className="text-xs text-muted-foreground">
+                                      <span className="font-medium">{field.label}:</span>{" "}
+                                      {value.length > 50 ? value.slice(0, 50) + "..." : value}
+                                    </p>
+                                  );
+                                }
+                                return null;
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground mt-1">No information provided</p>
+                          )}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditingCustomFields({ cartItemId: item.cartItemId })}
+                        >
+                          <Edit className="h-3 w-3 mr-1" />
+                          Edit
+                        </Button>
+                      </div>
+                      {!allRequiredFilled && (
+                        <div className="flex items-start gap-2 text-destructive">
+                          <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                          <p className="text-xs">Please fill in all required fields</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -287,6 +370,45 @@ export function CheckoutPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Custom Fields Edit Dialog */}
+      {editingCustomFields && (() => {
+        const editingItem = items.find((item) => item.cartItemId === editingCustomFields.cartItemId);
+
+        if (!editingItem?.customFields) return null;
+
+        return (
+          <Dialog
+            open={!!editingCustomFields}
+            onOpenChange={(open) => !open && setEditingCustomFields(null)}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Additional Information</DialogTitle>
+                <DialogDescription>
+                  {editingItem.name} - {editingItem.variantName}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                <CustomFieldsEditor
+                  fields={editingItem.customFields}
+                  responses={editingItem.customFieldResponses || {}}
+                  onResponseChange={(fieldId, value) =>
+                    updateCustomFieldResponse(editingItem.cartItemId, fieldId, value)
+                  }
+                  showValidation={true}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingCustomFields(null)}>
+                  Cancel
+                </Button>
+                <Button onClick={() => setEditingCustomFields(null)}>Save</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }

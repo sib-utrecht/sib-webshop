@@ -7,8 +7,8 @@ import { Label } from "@/components/ui/label";
 import { useCart } from "@/context/CartContext";
 import { ArrowLeft, ShoppingCart, Check } from "lucide-react";
 import { useState } from "react";
-import type { Id } from "../../convex/_generated/dataModel";
 import ReactMarkdown from "react-markdown";
+import { CustomFieldsEditor } from "@/components/product/CustomFieldsEditor";
 
 export function ProductPage() {
   const { productId } = useParams<{ productId: string }>();
@@ -27,6 +27,8 @@ export function ProductPage() {
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [customFieldResponses, setCustomFieldResponses] = useState<Record<string, string>>({});
+  const [showFieldValidation, setShowFieldValidation] = useState(false);
 
   // Set default variant and image when product loads
   if (product && selectedVariantId === null && product.variants.length > 0) {
@@ -36,6 +38,14 @@ export function ProductPage() {
     setSelectedImage(product.imageUrl);
   }
 
+  // Reset custom fields when variant changes
+  const handleVariantChange = (variantId: string) => {
+    setSelectedVariantId(variantId);
+    setCustomFieldResponses({});
+    setShowFieldValidation(false);
+    setAgreedToTerms(false);
+  };
+
   const selectedVariant = product?.variants.find(
     (v) => v.variantId === selectedVariantId
   );
@@ -44,18 +54,23 @@ export function ProductPage() {
     (s) => s.variantId === selectedVariantId
   );
 
-  const isInCart = items.some(
+  // For items with custom fields, each instance is separate and doesn't stack
+  // So we don't track "isInCart" or show quantity information the same way
+  const selectedVariantHasCustomFields = selectedVariant?.customFields && selectedVariant.customFields.length > 0;
+  
+  const isInCart = !selectedVariantHasCustomFields && items.some(
     (item) =>
       product &&
       item.productId === product._id &&
       item.variantId === selectedVariantId
   );
-  const cartItem = items.find(
+  
+  const cartItem = !selectedVariantHasCustomFields ? items.find(
     (item) =>
       product &&
       item.productId === product._id &&
       item.variantId === selectedVariantId
-  );
+  ) : undefined;
 
   const canAddToCart = () => {
     if (!product || !selectedVariant) return false;
@@ -63,9 +78,21 @@ export function ProductPage() {
     // Check stock availability
     if (selectedStock && selectedStock.available <= 0) return false;
     
+    // Check required agreements
     if (selectedVariant.requiredAgreements && selectedVariant.requiredAgreements.length > 0 && !agreedToTerms) {
       return false;
     }
+    
+    // Check required custom fields
+    if (selectedVariant.customFields && selectedVariant.customFields.length > 0) {
+      const allRequiredFieldsFilled = selectedVariant.customFields.every((field) => {
+        if (!field.required) return true;
+        return customFieldResponses[field.fieldId]?.trim();
+      });
+      if (!allRequiredFieldsFilled) return false;
+    }
+    
+    // Check max quantity
     if (selectedVariant.maxQuantity && cartItem && cartItem.quantity >= selectedVariant.maxQuantity) {
       return false;
     }
@@ -74,6 +101,13 @@ export function ProductPage() {
 
   const handleAddToCart = () => {
     if (!product || !selectedVariant) return;
+    
+    // Show validation if custom fields are not filled
+    if (!canAddToCart()) {
+      setShowFieldValidation(true);
+      return;
+    }
+    
     addItem({
       productId: product._id,
       variantId: selectedVariant.variantId,
@@ -83,7 +117,14 @@ export function ProductPage() {
       imageUrl: product.imageUrl,
       maxQuantity: selectedVariant.maxQuantity,
       requiredAgreements: selectedVariant.requiredAgreements,
+      customFields: selectedVariant.customFields,
+      customFieldResponses: customFieldResponses,
     });
+    
+    // Reset fields after adding to cart
+    setCustomFieldResponses({});
+    setAgreedToTerms(false);
+    setShowFieldValidation(false);
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 2000);
   };
@@ -199,10 +240,7 @@ export function ProductPage() {
                     <Button
                       key={variant.variantId}
                       variant={selectedVariantId === variant.variantId ? "default" : "outline"}
-                      onClick={() => {
-                        setSelectedVariantId(variant.variantId);
-                        setAgreedToTerms(false);
-                      }}
+                      onClick={() => handleVariantChange(variant.variantId)}
                       disabled={isOutOfStock}
                       className="flex-col h-auto py-2 px-4 relative"
                     >
@@ -263,6 +301,21 @@ export function ProductPage() {
                   </Label>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Custom Fields */}
+          {selectedVariant?.customFields && selectedVariant.customFields.length > 0 && (
+            <div className="mt-6 p-4 border rounded-lg bg-muted/50">
+              <h3 className="font-semibold mb-3">Additional Information</h3>
+              <CustomFieldsEditor
+                fields={selectedVariant.customFields}
+                responses={customFieldResponses}
+                onResponseChange={(fieldId, value) =>
+                  setCustomFieldResponses((prev) => ({ ...prev, [fieldId]: value }))
+                }
+                showValidation={showFieldValidation}
+              />
             </div>
           )}
 

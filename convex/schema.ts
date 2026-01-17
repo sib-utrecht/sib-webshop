@@ -18,6 +18,15 @@ export default defineSchema({
         price: v.number(),
         maxQuantity: v.optional(v.number()),
         requiredAgreements: v.optional(v.array(v.string())),
+        customFields: v.optional(v.array(
+          v.object({
+            fieldId: v.string(),
+            label: v.string(),
+            type: v.union(v.literal("text"), v.literal("email"), v.literal("tel"), v.literal("textarea")),
+            required: v.boolean(),
+            placeholder: v.optional(v.string()),
+          })
+        )),
       })
     ),
   }).index("by_product_id", ["productId"]),
@@ -44,6 +53,7 @@ export default defineSchema({
         variantName: v.string(),
         quantity: v.number(),
         price: v.number(),
+        customFieldResponses: v.optional(v.record(v.string(), v.string())),
       })
     ),
     totalAmount: v.number(),

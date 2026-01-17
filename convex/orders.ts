@@ -147,6 +147,7 @@ export const list = query({
           variantName: v.string(),
           quantity: v.number(),
           price: v.number(),
+          customFieldResponses: v.optional(v.record(v.string(), v.string())),
         })
       ),
       totalAmount: v.number(),
@@ -197,6 +198,7 @@ export const getByOrderId = query({
           variantName: v.string(),
           quantity: v.number(),
           price: v.number(),
+          customFieldResponses: v.optional(v.record(v.string(), v.string())),
         })
       ),
       totalAmount: v.number(),
@@ -257,6 +259,7 @@ export const getOrderSecure = query({
           variantName: v.string(),
           quantity: v.number(),
           price: v.number(),
+          customFieldResponses: v.optional(v.record(v.string(), v.string())),
         })
       ),
       totalAmount: v.number(),

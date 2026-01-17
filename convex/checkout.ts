@@ -12,6 +12,7 @@ export const createOrder = internalMutation({
         productId: v.id("products"),
         variantId: v.string(),
         quantity: v.number(),
+        customFieldResponses: v.optional(v.record(v.string(), v.string())),
       })
     ),
     email: v.string(),
@@ -105,6 +106,7 @@ export const createOrder = internalMutation({
         variantName: variant.name,
         quantity: item.quantity,
         price: variant.price,
+        customFieldResponses: item.customFieldResponses,
       });
     }
 
@@ -143,6 +145,7 @@ export const processCheckout = action({
         productId: v.id("products"),
         variantId: v.string(),
         quantity: v.number(),
+        customFieldResponses: v.optional(v.record(v.string(), v.string())),
       })
     ),
     email: v.string(),

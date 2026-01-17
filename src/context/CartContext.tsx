@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import type { Id } from "../../convex/_generated/dataModel";
 
 export interface CartItem {
+  cartItemId: string; // Unique ID for this cart entry (generated on add)
   productId: Id<"products">;
   variantId: string;
   name: string;
@@ -12,14 +13,23 @@ export interface CartItem {
   maxQuantity?: number;
   requiredAgreements?: string[];
   agreedToTerms?: boolean;
+  customFields?: Array<{
+    fieldId: string;
+    label: string;
+    type: "text" | "email" | "tel" | "textarea";
+    required: boolean;
+    placeholder?: string;
+  }>;
+  customFieldResponses?: Record<string, string>;
 }
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, "quantity" | "agreedToTerms">) => void;
-  removeItem: (productId: Id<"products">, variantId: string) => void;
-  updateQuantity: (productId: Id<"products">, variantId: string, quantity: number) => void;
-  updateAgreement: (productId: Id<"products">, variantId: string, agreed: boolean) => void;
+  addItem: (item: Omit<CartItem, "cartItemId" | "quantity" | "agreedToTerms">) => void;
+  removeItem: (cartItemId: string) => void;
+  updateQuantity: (cartItemId: string, quantity: number) => void;
+  updateAgreement: (cartItemId: string, agreed: boolean) => void;
+  updateCustomFieldResponse: (cartItemId: string, fieldId: string, value: string) => void;
   clearCart: () => void;
   totalItems: number;
   totalPrice: number;
@@ -39,16 +49,29 @@ function loadCartFromStorage(): CartItem[] {
     
     const items = JSON.parse(saved) as CartItem[];
     
-    // Validate that productIds are actually product IDs (not order IDs)
-    const validItems = items.filter(item => {
-      // Product IDs should not contain certain patterns that order IDs have
-      const id = item.productId as string;
-      // If ID looks suspicious (e.g., too long or contains patterns), filter it out
-      return id && id.length < 50 && !id.includes("order");
-    });
+    // Validate and migrate cart items
+    const validItems = items
+      .filter(item => {
+        // Product IDs should not contain certain patterns that order IDs have
+        const id = item.productId as string;
+        // If ID looks suspicious (e.g., too long or contains patterns), filter it out
+        return id && id.length < 50 && !id.includes("order");
+      })
+      .map(item => {
+        // Migrate items without cartItemId (from before this feature was added)
+        if (!item.cartItemId) {
+          return {
+            ...item,
+            cartItemId: item.customFields?.length
+              ? `${item.productId}-${item.variantId}-${Date.now()}-${Math.random()}`
+              : `${item.productId}-${item.variantId}`,
+          };
+        }
+        return item;
+      });
     
-    // If we filtered out items, update localStorage
-    if (validItems.length !== items.length) {
+    // Update localStorage with migrated items
+    if (validItems.length !== items.length || validItems.some((item, i) => item.cartItemId !== items[i].cartItemId)) {
       localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(validItems));
     }
     
@@ -67,8 +90,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
   }, [items]);
 
-  const addItem = (item: Omit<CartItem, "quantity" | "agreedToTerms">) => {
+  const addItem = (item: Omit<CartItem, "cartItemId" | "quantity" | "agreedToTerms">) => {
     setItems((prev) => {
+      // Items with custom fields should not stack - each one may have different responses
+      if (item.customFields && item.customFields.length > 0) {
+        return [
+          ...prev,
+          {
+            ...item,
+            cartItemId: `${item.productId}-${item.variantId}-${Date.now()}-${Math.random()}`,
+            quantity: 1,
+            agreedToTerms: item.requiredAgreements ? false : undefined,
+          },
+        ];
+      }
+
+      // For items without custom fields, allow stacking as before
       const existing = prev.find(
         (i) => i.productId === item.productId && i.variantId === item.variantId
       );
@@ -78,7 +115,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           return prev; // Don't add if max quantity reached
         }
         return prev.map((i) =>
-          i.productId === item.productId && i.variantId === item.variantId
+          i.cartItemId === existing.cartItemId
             ? { ...i, quantity: newQuantity }
             : i
         );
@@ -87,27 +124,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
         ...prev,
         {
           ...item,
+          cartItemId: `${item.productId}-${item.variantId}`,
           quantity: 1,
           agreedToTerms: item.requiredAgreements ? false : undefined,
+          customFieldResponses: item.customFields ? {} : undefined,
         },
       ];
     });
   };
 
-  const removeItem = (productId: Id<"products">, variantId: string) => {
-    setItems((prev) =>
-      prev.filter((i) => !(i.productId === productId && i.variantId === variantId))
-    );
+  const removeItem = (cartItemId: string) => {
+    setItems((prev) => prev.filter((i) => i.cartItemId !== cartItemId));
   };
 
-  const updateQuantity = (productId: Id<"products">, variantId: string, quantity: number) => {
+  const updateQuantity = (cartItemId: string, quantity: number) => {
     if (quantity <= 0) {
-      removeItem(productId, variantId);
+      removeItem(cartItemId);
       return;
     }
     setItems((prev) =>
       prev.map((i) => {
-        if (i.productId === productId && i.variantId === variantId) {
+        if (i.cartItemId === cartItemId) {
           if (i.maxQuantity && quantity > i.maxQuantity) {
             return i; // Don't update if exceeds max
           }
@@ -118,11 +155,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
   };
 
-  const updateAgreement = (productId: Id<"products">, variantId: string, agreed: boolean) => {
+  const updateAgreement = (cartItemId: string, agreed: boolean) => {
+    setItems((prev) =>
+      prev.map((i) => (i.cartItemId === cartItemId ? { ...i, agreedToTerms: agreed } : i))
+    );
+  };
+
+  const updateCustomFieldResponse = (cartItemId: string, fieldId: string, value: string) => {
     setItems((prev) =>
       prev.map((i) =>
-        i.productId === productId && i.variantId === variantId
-          ? { ...i, agreedToTerms: agreed }
+        i.cartItemId === cartItemId
+          ? { ...i, customFieldResponses: { ...i.customFieldResponses, [fieldId]: value } }
           : i
       )
     );
@@ -146,6 +189,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         removeItem,
         updateQuantity,
         updateAgreement,
+        updateCustomFieldResponse,
         clearCart,
         totalItems,
         totalPrice,

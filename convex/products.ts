@@ -8,6 +8,15 @@ const variantValidator = v.object({
   price: v.number(),
   maxQuantity: v.optional(v.number()),
   requiredAgreements: v.optional(v.array(v.string())),
+  customFields: v.optional(v.array(
+    v.object({
+      fieldId: v.string(),
+      label: v.string(),
+      type: v.union(v.literal("text"), v.literal("email"), v.literal("tel"), v.literal("textarea")),
+      required: v.boolean(),
+      placeholder: v.optional(v.string()),
+    })
+  )),
 });
 
 const productValidator = v.object({
@@ -126,6 +135,15 @@ export const create = mutation({
         price: v.number(),
         maxQuantity: v.optional(v.number()),
         requiredAgreements: v.optional(v.array(v.string())),
+        customFields: v.optional(v.array(
+          v.object({
+            fieldId: v.string(),
+            label: v.string(),
+            type: v.union(v.literal("text"), v.literal("email"), v.literal("tel"), v.literal("textarea")),
+            required: v.boolean(),
+            placeholder: v.optional(v.string()),
+          })
+        )),
       })
     ),
   },
@@ -187,6 +205,15 @@ export const update = mutation({
         price: v.number(),
         maxQuantity: v.optional(v.number()),
         requiredAgreements: v.optional(v.array(v.string())),
+        customFields: v.optional(v.array(
+          v.object({
+            fieldId: v.string(),
+            label: v.string(),
+            type: v.union(v.literal("text"), v.literal("email"), v.literal("tel"), v.literal("textarea")),
+            required: v.boolean(),
+            placeholder: v.optional(v.string()),
+          })
+        )),
       })
     ),
   },

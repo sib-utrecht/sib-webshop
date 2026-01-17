@@ -24,6 +24,13 @@ type Variant = {
   price: number;
   maxQuantity?: number;
   requiredAgreements?: string[];
+  customFields?: Array<{
+    fieldId: string;
+    label: string;
+    type: "text" | "email" | "tel" | "textarea";
+    required: boolean;
+    placeholder?: string;
+  }>;
   stock?: number;
 };
 
@@ -240,6 +247,50 @@ export function ProductEditorPage() {
     const newGallery = [...editingProduct.gallery];
     newGallery[index] = value;
     setEditingProduct({ ...editingProduct, gallery: newGallery });
+  };
+
+  const addCustomField = (variantIndex: number) => {
+    const newVariants = [...editingProduct.variants];
+    const currentFields = newVariants[variantIndex].customFields || [];
+    newVariants[variantIndex] = {
+      ...newVariants[variantIndex],
+      customFields: [
+        ...currentFields,
+        {
+          fieldId: `field_${Date.now()}`,
+          label: "",
+          type: "text" as const,
+          required: false,
+        },
+      ],
+    };
+    setEditingProduct({ ...editingProduct, variants: newVariants });
+  };
+
+  const removeCustomField = (variantIndex: number, fieldIndex: number) => {
+    const newVariants = [...editingProduct.variants];
+    const currentFields = newVariants[variantIndex].customFields || [];
+    newVariants[variantIndex] = {
+      ...newVariants[variantIndex],
+      customFields: currentFields.filter((_, i) => i !== fieldIndex),
+    };
+    setEditingProduct({ ...editingProduct, variants: newVariants });
+  };
+
+  const updateCustomField = (
+    variantIndex: number,
+    fieldIndex: number,
+    field: string,
+    value: any
+  ) => {
+    const newVariants = [...editingProduct.variants];
+    const currentFields = [...(newVariants[variantIndex].customFields || [])];
+    currentFields[fieldIndex] = { ...currentFields[fieldIndex], [field]: value };
+    newVariants[variantIndex] = {
+      ...newVariants[variantIndex],
+      customFields: currentFields,
+    };
+    setEditingProduct({ ...editingProduct, variants: newVariants });
   };
 
   return (
@@ -595,6 +646,108 @@ export function ProductEditorPage() {
                         />
                       </div>
                     </div>
+
+                    {/* Custom Fields Section */}
+                    <div className="mt-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">Custom Fields (optional)</Label>
+                        <Button
+                          type="button"
+                          onClick={() => addCustomField(index)}
+                          size="sm"
+                          variant="outline"
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Add Field
+                        </Button>
+                      </div>
+                      {variant.customFields && variant.customFields.length > 0 && (
+                        <div className="space-y-3 p-3 bg-muted/50 rounded-md">
+                          {variant.customFields.map((field, fieldIndex) => (
+                            <div key={field.fieldId} className="space-y-2 p-3 bg-background rounded-md border">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <Label htmlFor={`field-label-${index}-${fieldIndex}`} className="text-xs">
+                                    Label *
+                                  </Label>
+                                  <Input
+                                    id={`field-label-${index}-${fieldIndex}`}
+                                    value={field.label}
+                                    onChange={(e) =>
+                                      updateCustomField(index, fieldIndex, "label", e.target.value)
+                                    }
+                                    placeholder="e.g., Full Name"
+                                    className="h-8 text-sm"
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor={`field-type-${index}-${fieldIndex}`} className="text-xs">
+                                    Type
+                                  </Label>
+                                  <select
+                                    id={`field-type-${index}-${fieldIndex}`}
+                                    value={field.type}
+                                    onChange={(e) =>
+                                      updateCustomField(index, fieldIndex, "type", e.target.value)
+                                    }
+                                    className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                  >
+                                    <option value="text">Text</option>
+                                    <option value="email">Email</option>
+                                    <option value="tel">Phone</option>
+                                    <option value="textarea">Textarea</option>
+                                  </select>
+                                </div>
+                              </div>
+                              <div>
+                                <Label htmlFor={`field-placeholder-${index}-${fieldIndex}`} className="text-xs">
+                                  Placeholder (optional)
+                                </Label>
+                                <Input
+                                  id={`field-placeholder-${index}-${fieldIndex}`}
+                                  value={field.placeholder || ""}
+                                  onChange={(e) =>
+                                    updateCustomField(index, fieldIndex, "placeholder", e.target.value)
+                                  }
+                                  placeholder="e.g., Enter your full name"
+                                  className="h-8 text-sm"
+                                />
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    id={`field-required-${index}-${fieldIndex}`}
+                                    checked={field.required}
+                                    onChange={(e) =>
+                                      updateCustomField(index, fieldIndex, "required", e.target.checked)
+                                    }
+                                    className="h-4 w-4"
+                                  />
+                                  <Label
+                                    htmlFor={`field-required-${index}-${fieldIndex}`}
+                                    className="text-xs cursor-pointer"
+                                  >
+                                    Required field
+                                  </Label>
+                                </div>
+                                <Button
+                                  type="button"
+                                  onClick={() => removeCustomField(index, fieldIndex)}
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="h-3 w-3 mr-1" />
+                                  Remove
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     {editingProduct.variants.length > 1 && (
                       <Button
                         type="button"
