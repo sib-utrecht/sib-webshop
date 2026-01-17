@@ -29,14 +29,39 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 const CART_STORAGE_KEY = "webshop-cart";
 
-export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(CART_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [];
+// Helper to validate cart items from localStorage
+function loadCartFromStorage(): CartItem[] {
+  if (typeof window === "undefined") return [];
+  
+  try {
+    const saved = localStorage.getItem(CART_STORAGE_KEY);
+    if (!saved) return [];
+    
+    const items = JSON.parse(saved) as CartItem[];
+    
+    // Validate that productIds are actually product IDs (not order IDs)
+    const validItems = items.filter(item => {
+      // Product IDs should not contain certain patterns that order IDs have
+      const id = item.productId as string;
+      // If ID looks suspicious (e.g., too long or contains patterns), filter it out
+      return id && id.length < 50 && !id.includes("order");
+    });
+    
+    // If we filtered out items, update localStorage
+    if (validItems.length !== items.length) {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(validItems));
     }
+    
+    return validItems;
+  } catch (error) {
+    console.error("Error loading cart from localStorage:", error);
+    localStorage.removeItem(CART_STORAGE_KEY);
     return [];
-  });
+  }
+}
+
+export function CartProvider({ children }: { children: ReactNode }) {
+  const [items, setItems] = useState<CartItem[]>(loadCartFromStorage);
 
   useEffect(() => {
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));

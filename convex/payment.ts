@@ -8,30 +8,23 @@ import { internal, api } from "./_generated/api";
 /**
  * Create a Mollie payment for an order
  */
-export const createPaymentForOrder = action({
+export const generatePaymentUrl = internalAction({
   args: {
     orderId: v.string(),
+    orderDbId: v.id("orders"),
+    name: v.string(),
+    email: v.string(),
+    totalAmount: v.number(),
   },
   returns: v.object({
     success: v.boolean(),
     checkoutUrl: v.optional(v.string()),
+    paymentId: v.optional(v.string()),
     message: v.string(),
   }),
-  handler: async (ctx, args): Promise<{ success: boolean; checkoutUrl?: string; message: string }> => {
-    // Get order details
-    const order: { _id: string; orderId: string; name: string; email: string; totalAmount: number } | null = await ctx.runQuery(internal.orders.findOrder, {
-      orderId: args.orderId,
-    });
-
-    if (!order) {
-      return {
-        success: false,
-        message: "Order not found",
-      };
-    }
-
+  handler: async (ctx, args): Promise<{ success: boolean; checkoutUrl?: string; paymentId?: string; message: string }> => {
     // Check if this should be a test payment (name contains "TEST")
-    const isTestPayment = order.name.toUpperCase().includes("TEST");
+    const isTestPayment = args.name.includes("TEST");
 
     // Use appropriate API key based on test mode
     const apiKey = isTestPayment 
@@ -51,33 +44,36 @@ export const createPaymentForOrder = action({
       // Get the base URL from environment or use default
       const baseUrl = process.env.VITE_APP_URL || "http://localhost:5173";
       const webhookUrl = process.env.CONVEX_SITE_URL 
-        ? `${process.env.CONVEX_SITE_URL}/payment-webhook`
+        ? `${process.env.CONVEX_SITE_URL}/payment-webhook?orderId=${encodeURIComponent(args.orderId)}`
         : undefined;
+
+      console.log("OrderId: ", args.orderId);
+      console.log("OrderDbId: ", args.orderDbId);
+      console.log("Creating Mollie payment with webhook URL:", webhookUrl);
+      console.log("Base url:", baseUrl);
 
       // Create payment with Mollie
       const payment = await mollieClient.payments.create({
         amount: {
           currency: "EUR",
-          value: order.totalAmount.toFixed(2),
+          value: args.totalAmount.toFixed(2),
         },
         description: `Order ${args.orderId} - SIB Webshop${isTestPayment ? " (TEST)" : ""}`,
-        redirectUrl: `${baseUrl}/checkout/success?orderId=${args.orderId}&id=${order._id}`,
+        redirectUrl: `${baseUrl}/checkout/success?orderId=${args.orderId}&id=${args.orderDbId}`,
         webhookUrl,
         metadata: {
           orderId: args.orderId,
         },
       });
 
-      // Update order with payment info
-      await ctx.runMutation(internal.checkout.updateOrderPayment, {
-        orderId: args.orderId,
-        paymentId: payment.id,
-        checkoutUrl: payment._links.checkout?.href || "",
-      });
+      console.log("Mollie payment created:", payment.id);
+      const checkoutUrl = payment._links.checkout?.href;
+      console.log("Mollie checkout URL:", checkoutUrl);
 
       return {
         success: true,
         checkoutUrl: payment._links.checkout?.href,
+        paymentId: payment.id,
         message: "Payment created successfully",
       };
     } catch (error) {
@@ -91,35 +87,67 @@ export const createPaymentForOrder = action({
 });
 
 /**
- * Process Mollie webhook callback (called from HTTP endpoint)
+ * Fetch payment status from Mollie (purely functional - no mutations)
  */
-export const processWebhook = internalAction({
+export const fetchMolliePayment = internalAction({
   args: {
     paymentId: v.string(),
+    orderId: v.optional(v.string()),
   },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const apiKey = process.env.MOLLIE_API_KEY;
+  returns: v.object({
+    success: v.boolean(),
+    paymentId: v.string(),
+    orderId: v.optional(v.string()),
+    status: v.string(),
+    message: v.optional(v.string()),
+  }),
+  handler: async (ctx, args): Promise<{ success: boolean; paymentId: string; orderId?: string; status: string; message?: string }> => {
+    // Determine if this is a test payment based on orderId suffix
+    const isTestPayment = args.orderId?.endsWith("_TEST") ?? false;
+    
+    // Use appropriate API key
+    const apiKey = isTestPayment
+      ? (process.env.MOLLIE_TEST_API_KEY || process.env.MOLLIE_API_KEY)
+      : process.env.MOLLIE_API_KEY;
+    
     if (!apiKey) {
       console.error("Mollie API key not configured");
-      throw new Error("Mollie API key not configured");
+      return {
+        success: false,
+        paymentId: args.paymentId,
+        orderId: args.orderId,
+        status: "failed",
+        message: "Mollie API key not configured",
+      };
     }
+
+    console.log(`Fetching payment ${args.paymentId} (${isTestPayment ? "TEST" : "LIVE"} mode)`);
 
     try {
       // Fetch payment status from Mollie
       const mollieClient = createMollieClient({ apiKey });
       const payment = await mollieClient.payments.get(args.paymentId);
 
-      // Update order with payment status
-      await ctx.runMutation(internal.checkout.completeOrderPayment, {
-        paymentId: payment.id,
-        status: payment.status,
-      });
+      // Extract orderId from payment metadata (fallback to URL parameter)
+      const metadata = payment.metadata as { orderId?: string } | undefined;
+      const orderIdFromMetadata = metadata?.orderId;
+      const orderId = orderIdFromMetadata || args.orderId;
 
-      return null;
+      return {
+        success: true,
+        paymentId: payment.id,
+        orderId,
+        status: payment.status,
+      };
     } catch (error) {
-      console.error("Webhook processing error:", error);
-      throw error;
+      console.error("Mollie API error:", error);
+      return {
+        success: false,
+        paymentId: args.paymentId,
+        orderId: args.orderId,
+        status: "failed",
+        message: error instanceof Error ? error.message : "Failed to fetch payment",
+      };
     }
   },
 });

@@ -1,7 +1,96 @@
-import { query, internalQuery } from "./_generated/server";
+import { query, internalQuery, action, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { requireAdmin } from "./auth";
+import { internal } from "./_generated/api";
 
+/**
+ * Internal action to create payment for an order (called by processCheckout)
+ * Security: Queries order from database to verify data integrity
+ */
+export const createPaymentForOrder = internalAction({
+  args: {
+    orderDbId: v.id("orders"),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    checkoutUrl: v.optional(v.string()),
+    message: v.string(),
+  }),
+  handler: async (ctx, args): Promise<{ success: boolean; checkoutUrl?: string; message: string }> => {
+    // Query order from database to get authoritative data
+    const order = await ctx.runQuery(internal.orders.getOrderById, {
+      orderDbId: args.orderDbId,
+    });
+
+    if (!order) {
+      return {
+        success: false,
+        message: "Order not found",
+      };
+    }
+
+    // Call internal action to create Mollie payment with verified data
+    const paymentResult = await ctx.runAction(internal.payment.generatePaymentUrl, {
+      orderId: order.orderId,
+      orderDbId: args.orderDbId,
+      name: order.name,
+      email: order.email,
+      totalAmount: order.totalAmount,
+    });
+
+    if (!paymentResult.success || !paymentResult.paymentId || !paymentResult.checkoutUrl) {
+      return paymentResult;
+    }
+
+    // Update order with payment info via mutation
+    await ctx.runMutation(internal.checkout.updateOrderPayment, {
+      orderDbId: args.orderDbId,
+      paymentId: paymentResult.paymentId,
+      checkoutUrl: paymentResult.checkoutUrl,
+    });
+
+    return {
+      success: true,
+      checkoutUrl: paymentResult.checkoutUrl,
+      message: "Payment created successfully",
+    };
+  },
+});
+
+
+/**
+ * Internal query to get order by database ID
+ */
+export const getOrderById = internalQuery({
+  args: {
+    orderDbId: v.id("orders"),
+  },
+  returns: v.union(
+    v.object({
+      _id: v.id("orders"),
+      orderId: v.string(),
+      name: v.string(),
+      email: v.string(),
+      totalAmount: v.number(),
+    }),
+    v.null()
+  ),
+  handler: async (ctx, args) => {
+    const order = await ctx.db.get(args.orderDbId);
+
+    if (!order) {
+      return null;
+    }
+
+    return {
+      _id: order._id,
+      orderId: order.orderId,
+      name: order.name,
+      email: order.email,
+      totalAmount: order.totalAmount,
+    };
+  },
+});
 
 /**
  * Internal query to find an order by orderId

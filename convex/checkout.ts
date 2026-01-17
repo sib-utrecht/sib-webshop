@@ -1,8 +1,11 @@
-import { mutation, internalMutation } from "./_generated/server";
+import { mutation, internalMutation, action } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 
-export const processCheckout = mutation({
+/**
+ * Create an order (internal use - called by processCheckout action)
+ */
+export const createOrder = internalMutation({
   args: {
     items: v.array(
       v.object({
@@ -19,7 +22,10 @@ export const processCheckout = mutation({
     success: v.boolean(),
     message: v.string(),
     orderId: v.optional(v.string()),
-    checkoutUrl: v.optional(v.string()),
+    orderDbId: v.optional(v.id("orders")),
+    name: v.optional(v.string()),
+    email: v.optional(v.string()),
+    totalAmount: v.optional(v.number()),
   }),
   handler: async (ctx, args) => {
     // Validate quantities are positive integers
@@ -60,11 +66,13 @@ export const processCheckout = mutation({
     }
 
     // Generate order ID with year and month (e.g., SIB-2026-01-ABC123)
+    // Add _TEST suffix if this is a test order (name contains "TEST")
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const randomId = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const orderId = `SIB-${year}-${month}-${randomId}`;
+    const isTestOrder = args.name.toUpperCase().includes("TEST");
+    const orderId = `SIB-${year}-${month}-${randomId}${isTestOrder ? "_TEST" : ""}`;
 
     // Prepare order items with full details
     const orderItems = [];
@@ -116,6 +124,71 @@ export const processCheckout = mutation({
       success: true,
       message: "Order created successfully",
       orderId,
+      orderDbId,
+      name: args.name,
+      email: args.email,
+      totalAmount,
+    };
+  },
+});
+
+/**
+ * Process checkout: create order and initiate payment
+ * Single endpoint for the client to call
+ */
+export const processCheckout = action({
+  args: {
+    items: v.array(
+      v.object({
+        productId: v.id("products"),
+        variantId: v.string(),
+        quantity: v.number(),
+      })
+    ),
+    email: v.string(),
+    name: v.string(),
+    comments: v.optional(v.string()),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    checkoutUrl: v.optional(v.string()),
+    message: v.string(),
+    orderId: v.optional(v.string()),
+  }),
+  handler: async (ctx, args): Promise<{ success: boolean; checkoutUrl?: string; message: string; orderId?: string }> => {
+    // Step 1: Create order
+    const orderResult = await ctx.runMutation(internal.checkout.createOrder, {
+      items: args.items,
+      email: args.email,
+      name: args.name,
+      comments: args.comments,
+    });
+
+    if (!orderResult.success || !orderResult.orderDbId) {
+      return {
+        success: false,
+        message: orderResult.message,
+      };
+    }
+
+    // Step 2: Create payment
+    const paymentResult = await ctx.runAction(internal.orders.createPaymentForOrder, {
+      orderDbId: orderResult.orderDbId,
+    });
+
+    if (!paymentResult.success || !paymentResult.checkoutUrl) {
+      return {
+        success: false,
+        message: paymentResult.message,
+        orderId: orderResult.orderId,
+      };
+    }
+
+    return {
+      success: true,
+      checkoutUrl: paymentResult.checkoutUrl,
+      message: "Checkout processed successfully",
+      orderId: orderResult.orderId,
     };
   },
 });
@@ -125,23 +198,16 @@ export const processCheckout = mutation({
  */
 export const updateOrderPayment = internalMutation({
   args: {
-    orderId: v.string(),
+    orderDbId: v.id("orders"),
     paymentId: v.string(),
     checkoutUrl: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const order = await ctx.db
-      .query("orders")
-      .withIndex("by_order_id", (q) => q.eq("orderId", args.orderId))
-      .first();
-
-    if (order) {
-      await ctx.db.patch(order._id, {
-        molliePaymentId: args.paymentId,
-        mollieCheckoutUrl: args.checkoutUrl,
-      });
-    }
+    await ctx.db.patch(args.orderDbId, {
+      molliePaymentId: args.paymentId,
+      mollieCheckoutUrl: args.checkoutUrl,
+    });
 
     return null;
   },
@@ -150,21 +216,21 @@ export const updateOrderPayment = internalMutation({
 /**
  * Complete order payment (called from webhook)
  */
-export const completeOrderPayment = internalMutation({
+export const updateOrderStatus = internalMutation({
   args: {
-    paymentId: v.string(),
+    orderId: v.string(),
     status: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // Find order by Mollie payment ID
+    // Find order by orderId
     const order = await ctx.db
       .query("orders")
-      .withIndex("by_mollie_payment_id", (q) => q.eq("molliePaymentId", args.paymentId))
+      .withIndex("by_order_id", (q) => q.eq("orderId", args.orderId))
       .first();
 
     if (!order) {
-      console.error(`Order not found for payment ID: ${args.paymentId}`);
+      console.error(`Order not found for orderId: ${args.orderId}`);
       return null;
     }
 

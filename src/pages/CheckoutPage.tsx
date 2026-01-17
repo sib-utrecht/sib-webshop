@@ -7,13 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCart } from "@/context/CartContext";
 import ReactMarkdown from "react-markdown";
-import { useMutation, useAction } from "convex/react";
+import { useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
 export function CheckoutPage() {
   const { items, totalPrice, removeItem, updateAgreement } = useCart();
-  const processCheckout = useMutation(api.checkout.processCheckout);
-  const createPayment = useAction(api.payment.createPaymentForOrder);
+  const processCheckout = useAction(api.checkout.processCheckout);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [comments, setComments] = useState("");
@@ -49,6 +48,13 @@ export function CheckoutPage() {
     setError("");
 
     try {
+      // Validate cart items before submitting
+      if (items.length === 0) {
+        setError("Your cart is empty");
+        setIsSubmitting(false);
+        return;
+      }
+
       // Step 1: Create order in database
       const result = await processCheckout({
         items: items.map((item) => ({
@@ -67,21 +73,14 @@ export function CheckoutPage() {
         return;
       }
 
-      const createdOrderId = result.orderId || "";
-
-      // Step 2: Create Mollie payment
-      const paymentResult = await createPayment({
-        orderId: createdOrderId,
-      });
-
-      if (!paymentResult.success || !paymentResult.checkoutUrl) {
-        setError(paymentResult.message || "Failed to create payment");
+      if (!result.checkoutUrl) {
+        setError("Failed to create payment");
         setIsSubmitting(false);
         return;
       }
 
-      // Step 3: Redirect to Mollie payment page
-      window.location.href = paymentResult.checkoutUrl;
+      // Step 2: Redirect to Mollie payment page
+      window.location.href = result.checkoutUrl;
     } catch (err) {
       console.error("Checkout error:", err);
       setError("An error occurred during checkout. Please try again.");
