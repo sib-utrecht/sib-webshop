@@ -1,7 +1,16 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Eye, Plus, Trash2, Table as TableIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Id } from "../../convex/_generated/dataModel";
@@ -10,10 +19,19 @@ export function ViewsListPage() {
   const views = useQuery(api.views.list);
   const removeView = useMutation(api.views.remove);
   const navigate = useNavigate();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [viewToDelete, setViewToDelete] = useState<Id<"views"> | null>(null);
 
-  const handleDelete = async (viewId: Id<"views">) => {
-    if (confirm("Are you sure you want to delete this view?")) {
-      await removeView({ viewId });
+  const handleDeleteClick = (viewId: Id<"views">) => {
+    setViewToDelete(viewId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (viewToDelete) {
+      await removeView({ viewId: viewToDelete });
+      setDeleteDialogOpen(false);
+      setViewToDelete(null);
     }
   };
 
@@ -107,7 +125,7 @@ export function ViewsListPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDelete(view._id)}
+                    onClick={() => handleDeleteClick(view._id)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -117,6 +135,32 @@ export function ViewsListPage() {
           ))}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete View</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this view? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

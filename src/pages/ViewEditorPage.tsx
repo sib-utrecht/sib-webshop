@@ -55,6 +55,7 @@ export function ViewEditorPage() {
   const [sortBy, setSortBy] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   // Load existing view data
   useEffect(() => {
@@ -103,13 +104,15 @@ export function ViewEditorPage() {
   };
 
   const handleSave = async () => {
+    setError("");
+    
     if (!name.trim()) {
-      alert("Please enter a view name");
+      setError("Please enter a view name");
       return;
     }
 
     if (selectedColumns.length === 0) {
-      alert("Please select at least one column");
+      setError("Please select at least one column");
       return;
     }
 
@@ -144,7 +147,7 @@ export function ViewEditorPage() {
       navigate(`/views/${viewId}`);
     } catch (error) {
       console.error("Error saving view:", error);
-      alert("Failed to save view. Please try again.");
+      setError("Failed to save view. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -198,6 +201,13 @@ export function ViewEditorPage() {
       </div>
 
       <div className="space-y-6">
+        {/* Error Message */}
+        {error && (
+          <div className="bg-destructive/15 text-destructive px-4 py-3 rounded-md border border-destructive/30">
+            {error}
+          </div>
+        )}
+
         {/* Basic Information */}
         <Card>
           <CardHeader>

@@ -105,8 +105,12 @@ export function ViewDetailPage() {
         view.columns
           .map((col) => {
             const value = getCellValue(row, col);
-            // Handle Badge components and other React nodes
+            // Handle React nodes (like Badge components)
             if (typeof value === "object" && value !== null) {
+              // For Badge components, extract the status text
+              if (col === "orderStatus") {
+                return row.orderStatus;
+              }
               return "";
             }
             // Escape commas and quotes for CSV
