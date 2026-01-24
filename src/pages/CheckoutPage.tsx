@@ -234,7 +234,7 @@ export function CheckoutPage() {
                               id={`checkout-agreement-${item.cartItemId}-${index}`}
                               checked={item.agreedToTerms || false}
                               onChange={(e) => updateAgreement(item.cartItemId, e.target.checked)}
-                              className="mt-1"
+                              className="mt-1 cursor-pointer"
                             />
                             <Label
                               htmlFor={`checkout-agreement-${item.cartItemId}-${index}`}

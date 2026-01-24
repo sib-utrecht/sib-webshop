@@ -186,7 +186,7 @@ export function ProductPage() {
                 <button
                   key={index}
                   onClick={() => setSelectedImage(img)}
-                  className={`aspect-square overflow-hidden rounded-md bg-muted border-2 transition-colors ${
+                  className={`aspect-square overflow-hidden rounded-md bg-muted border-2 transition-colors cursor-pointer ${
                     selectedImage === img ? "border-primary" : "border-transparent"
                   }`}
                 >
@@ -286,7 +286,7 @@ export function ProductPage() {
                     id={`agreement-${index}`}
                     checked={agreedToTerms}
                     onChange={(e) => setAgreedToTerms(e.target.checked)}
-                    className="mt-1"
+                    className="mt-1 cursor-pointer"
                   />
                   <Label htmlFor={`agreement-${index}`} className="text-sm cursor-pointer">
                     <span className="inline">

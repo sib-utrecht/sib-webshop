@@ -669,7 +669,7 @@ export function ProductEditorPage() {
                     isVirtual: e.target.checked,
                   })
                 }
-                className="h-4 w-4"
+                className="h-4 w-4 cursor-pointer"
               />
               <Label htmlFor="isVirtual">Virtual Product (no shipping)</Label>
             </div>
@@ -816,7 +816,7 @@ export function ProductEditorPage() {
                                     onChange={(e) =>
                                       updateCustomField(index, fieldIndex, "type", e.target.value)
                                     }
-                                    className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                    className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 cursor-pointer"
                                   >
                                     <option value="text">Text</option>
                                     <option value="email">Email</option>
@@ -848,7 +848,7 @@ export function ProductEditorPage() {
                                     onChange={(e) =>
                                       updateCustomField(index, fieldIndex, "required", e.target.checked)
                                     }
-                                    className="h-4 w-4"
+                                    className="h-4 w-4 cursor-pointer"
                                   />
                                   <Label
                                     htmlFor={`field-required-${index}-${fieldIndex}`}
