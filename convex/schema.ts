@@ -12,7 +12,8 @@ export default defineSchema({
     isVirtual: v.boolean(),
     isVisible: v.optional(v.boolean()),
     sortOrder: v.optional(v.number()),
-    variants: v.array(
+    // Legacy field - kept optional for migration, can be removed after migration
+    variants: v.optional(v.array(
       v.object({
         variantId: v.string(),
         name: v.string(),
@@ -29,8 +30,28 @@ export default defineSchema({
           })
         )),
       })
-    ),
+    )),
   }).index("by_product_id", ["productId"]),
+
+  variants: defineTable({
+    productId: v.id("products"),
+    variantId: v.string(),
+    name: v.string(),
+    price: v.number(),
+    maxQuantity: v.optional(v.number()),
+    requiredAgreements: v.optional(v.array(v.string())),
+    customFields: v.optional(v.array(
+      v.object({
+        fieldId: v.string(),
+        label: v.string(),
+        type: v.union(v.literal("text"), v.literal("email"), v.literal("tel"), v.literal("textarea")),
+        required: v.boolean(),
+        placeholder: v.optional(v.string()),
+      })
+    )),
+  })
+    .index("by_product_id", ["productId"])
+    .index("by_product_variant", ["productId", "variantId"]),
 
   stock: defineTable({
     productId: v.id("products"),
@@ -80,4 +101,15 @@ export default defineSchema({
     )),
   }).index("by_order_id", ["orderId"])
     .index("by_mollie_payment_id", ["molliePaymentId"]),
+
+  views: defineTable({
+    name: v.string(),
+    columns: v.array(v.string()), // Column IDs to display (e.g., ["email", "productName", "variantName", "customField_fieldId"])
+    filters: v.optional(v.object({
+      variantIds: v.optional(v.array(v.id("variants"))), // Variant database IDs
+      statuses: v.optional(v.array(v.string())),
+    })),
+    sortBy: v.optional(v.string()), // Column ID to sort by
+    sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
+  }).index("by_name", ["name"]),
 });

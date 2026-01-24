@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { HomePage } from "@/pages/HomePage";
 import { ProductPage } from "@/pages/ProductPage";
 import { CheckoutPage } from "@/pages/CheckoutPage";
@@ -9,11 +10,14 @@ import { StockOverviewPage } from "@/pages/StockOverviewPage";
 import { ProductEditorPage } from "@/pages/ProductEditorPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { DebugPage } from "@/pages/DebugPage";
+import { ViewsListPage } from "@/pages/ViewsListPage";
+import { ViewDetailPage } from "@/pages/ViewDetailPage";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 function App() {
   return (
-    <BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<HomePage />} />
@@ -46,9 +50,26 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/views"
+            element={
+              <ProtectedRoute>
+                <ViewsListPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/views/:viewId"
+            element={
+              <ProtectedRoute>
+                <ViewDetailPage />
+              </ProtectedRoute>
+            }
+          />
         </Route>
       </Routes>
     </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 

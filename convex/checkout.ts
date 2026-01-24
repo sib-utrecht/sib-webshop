@@ -88,7 +88,14 @@ export const createOrder = internalMutation({
         };
       }
 
-      const variant = product.variants.find((v) => v.variantId === item.variantId);
+      // Fetch variant from variants table
+      const variant = await ctx.db
+        .query("variants")
+        .withIndex("by_product_variant", (q) => 
+          q.eq("productId", item.productId).eq("variantId", item.variantId)
+        )
+        .first();
+      
       if (!variant) {
         return {
           success: false,
