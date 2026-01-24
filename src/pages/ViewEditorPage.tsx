@@ -2,13 +2,13 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useParams, useNavigate } from "react-router-dom";
-import { Id } from "../../convex/_generated/dataModel";
+import type { Id } from "../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, Save, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from "lucide-react";
 
 // Available columns
 const AVAILABLE_COLUMNS = [
@@ -49,13 +49,13 @@ export function ViewEditorPage() {
     "variantName",
     "quantity",
   ]);
-  const [selectedProductIds, setSelectedProductIds] = useState<Id<"products">[]>([]);
-  const [selectedVariantIds, setSelectedVariantIds] = useState<string[]>([]);
+  const [selectedVariantIds, setSelectedVariantIds] = useState<Id<"variants">[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [expandedProducts, setExpandedProducts] = useState<Set<Id<"products">>>(new Set());
 
   // Load existing view data
   useEffect(() => {
@@ -63,7 +63,7 @@ export function ViewEditorPage() {
       setName(existingView.name);
       setDescription(existingView.description || "");
       setSelectedColumns(existingView.columns);
-      setSelectedProductIds(existingView.filters?.productIds || []);
+      // Variant IDs are stored as composite keys (productId-variantId)
       setSelectedVariantIds(existingView.filters?.variantIds || []);
       setSelectedStatuses(existingView.filters?.statuses || []);
       setSortBy(existingView.sortBy || "");
@@ -79,20 +79,81 @@ export function ViewEditorPage() {
     );
   };
 
+  const moveColumnUp = (columnId: string) => {
+    setSelectedColumns((prev) => {
+      const index = prev.indexOf(columnId);
+      if (index <= 0) return prev;
+      const newColumns = [...prev];
+      [newColumns[index - 1], newColumns[index]] = [newColumns[index], newColumns[index - 1]];
+      return newColumns;
+    });
+  };
+
+  const moveColumnDown = (columnId: string) => {
+    setSelectedColumns((prev) => {
+      const index = prev.indexOf(columnId);
+      if (index === -1 || index >= prev.length - 1) return prev;
+      const newColumns = [...prev];
+      [newColumns[index], newColumns[index + 1]] = [newColumns[index + 1], newColumns[index]];
+      return newColumns;
+    });
+  };
+
+  const toggleProductExpansion = (productId: Id<"products">) => {
+    setExpandedProducts((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(productId)) {
+        newSet.delete(productId);
+      } else {
+        newSet.add(productId);
+      }
+      return newSet;
+    });
+  };
+
   const handleProductToggle = (productId: Id<"products">) => {
-    setSelectedProductIds((prev) =>
-      prev.includes(productId)
-        ? prev.filter((id) => id !== productId)
-        : [...prev, productId]
+    const product = products?.find((p) => p._id === productId);
+    if (!product) return;
+
+    // Get all variant database IDs for this product
+    const allVariantDbIds = product.variants.map((v) => v._id);
+    const allSelected = allVariantDbIds.every((id) => selectedVariantIds.includes(id));
+
+    if (allSelected) {
+      // Deselect all variants of this product
+      setSelectedVariantIds((prev) => prev.filter((id) => !allVariantDbIds.includes(id)));
+    } else {
+      // Select all variants of this product
+      setSelectedVariantIds((prev) => {
+        const newSet = new Set(prev);
+        allVariantDbIds.forEach((id) => newSet.add(id));
+        return Array.from(newSet);
+      });
+    }
+  };
+
+  const handleVariantToggle = (variantDbId: Id<"variants">) => {
+    setSelectedVariantIds((prev) =>
+      prev.includes(variantDbId)
+        ? prev.filter((id) => id !== variantDbId)
+        : [...prev, variantDbId]
     );
   };
 
-  const handleVariantToggle = (variantId: string) => {
-    setSelectedVariantIds((prev) =>
-      prev.includes(variantId)
-        ? prev.filter((id) => id !== variantId)
-        : [...prev, variantId]
-    );
+  const isProductSelected = (productId: Id<"products">) => {
+    const product = products?.find((p) => p._id === productId);
+    if (!product) return false;
+    const allVariantDbIds = product.variants.map((v) => v._id);
+    return allVariantDbIds.every((id) => selectedVariantIds.includes(id));
+  };
+
+  const isProductPartiallySelected = (productId: Id<"products">) => {
+    const product = products?.find((p) => p._id === productId);
+    if (!product) return false;
+    const allVariantDbIds = product.variants.map((v) => v._id);
+    const someSelected = allVariantDbIds.some((id) => selectedVariantIds.includes(id));
+    const allSelected = allVariantDbIds.every((id) => selectedVariantIds.includes(id));
+    return someSelected && !allSelected;
   };
 
   const handleStatusToggle = (status: string) => {
@@ -108,11 +169,13 @@ export function ViewEditorPage() {
     
     if (!name.trim()) {
       setError("Please enter a view name");
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
     if (selectedColumns.length === 0) {
       setError("Please select at least one column");
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
@@ -123,7 +186,6 @@ export function ViewEditorPage() {
         description: description.trim() || undefined,
         columns: selectedColumns,
         filters: {
-          productIds: selectedProductIds.length > 0 ? selectedProductIds : undefined,
           variantIds: selectedVariantIds.length > 0 ? selectedVariantIds : undefined,
           statuses: selectedStatuses.length > 0 ? selectedStatuses : undefined,
         },
@@ -146,6 +208,7 @@ export function ViewEditorPage() {
     } catch (error) {
       console.error("Error saving view:", error);
       setError("Failed to save view. Please try again.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setSaving(false);
     }
@@ -166,16 +229,6 @@ export function ViewEditorPage() {
       </div>
     );
   }
-
-  // Get all unique variants from all products
-  const allVariants =
-    products?.flatMap((product) =>
-      product.variants.map((variant) => ({
-        variantId: variant.variantId,
-        name: `${product.name} - ${variant.name}`,
-        productId: product._id,
-      }))
-    ) || [];
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -239,26 +292,79 @@ export function ViewEditorPage() {
           <CardHeader>
             <CardTitle>Columns to Display</CardTitle>
             <CardDescription>
-              Select which columns to show in the table
+              Select which columns to show in the table and reorder them
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {AVAILABLE_COLUMNS.map((column) => (
-                <label
-                  key={column.id}
-                  className="flex items-center gap-2 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedColumns.includes(column.id)}
-                    onChange={() => handleColumnToggle(column.id)}
-                    className="rounded"
-                  />
-                  <span className="text-sm">{column.label}</span>
-                </label>
-              ))}
+          <CardContent className="space-y-6">
+            {/* Available Columns */}
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Available Columns</Label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {AVAILABLE_COLUMNS.map((column) => (
+                  <label
+                    key={column.id}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedColumns.includes(column.id)}
+                      onChange={() => handleColumnToggle(column.id)}
+                      className="rounded"
+                    />
+                    <span className="text-sm">{column.label}</span>
+                  </label>
+                ))}
+              </div>
             </div>
+
+            {/* Column Order */}
+            {selectedColumns.length > 0 && (
+              <div>
+                <Label className="text-sm font-medium mb-2 block">Column Order</Label>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Use the arrows to reorder columns. This is the order they will appear in the table.
+                </p>
+                <div className="space-y-2">
+                  {selectedColumns.map((columnId, index) => {
+                    const column = AVAILABLE_COLUMNS.find((c) => c.id === columnId);
+                    if (!column) return null;
+                    return (
+                      <div
+                        key={columnId}
+                        className="flex items-center gap-2 p-2 bg-muted/30 rounded border"
+                      >
+                        <span className="text-sm font-medium text-muted-foreground w-6">
+                          {index + 1}.
+                        </span>
+                        <span className="text-sm flex-1">{column.label}</span>
+                        <div className="flex gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => moveColumnUp(columnId)}
+                            disabled={index === 0}
+                            className="h-7 w-7 p-0"
+                          >
+                            <ArrowUp className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => moveColumnDown(columnId)}
+                            disabled={index === selectedColumns.length - 1}
+                            className="h-7 w-7 p-0"
+                          >
+                            <ArrowDown className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -271,58 +377,87 @@ export function ViewEditorPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Product Filter */}
+            {/* Product and Variant Filter */}
             <div>
               <Label className="text-base font-semibold mb-3 block">
-                Filter by Products
+                Filter by Products and Variants
               </Label>
+              <p className="text-sm text-muted-foreground mb-3">
+                Select products to filter by. Click on a product to expand and select specific variants.
+              </p>
               {products === undefined ? (
                 <div className="text-sm text-muted-foreground">Loading products...</div>
               ) : products.length === 0 ? (
                 <div className="text-sm text-muted-foreground">No products available</div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border rounded">
-                  {products.map((product) => (
-                    <label
-                      key={product._id}
-                      className="flex items-center gap-2 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedProductIds.includes(product._id)}
-                        onChange={() => handleProductToggle(product._id)}
-                        className="rounded"
-                      />
-                      <span className="text-sm">{product.name}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
+                <div className="space-y-1 p-2 border rounded">
+                  {products.map((product) => {
+                    const isExpanded = expandedProducts.has(product._id);
+                    const isChecked = isProductSelected(product._id);
+                    const isIndeterminate = isProductPartiallySelected(product._id);
 
-            {/* Variant Filter */}
-            <div>
-              <Label className="text-base font-semibold mb-3 block">
-                Filter by Variants
-              </Label>
-              {allVariants.length === 0 ? (
-                <div className="text-sm text-muted-foreground">No variants available</div>
-              ) : (
-                <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto p-2 border rounded">
-                  {allVariants.map((variant) => (
-                    <label
-                      key={variant.variantId}
-                      className="flex items-center gap-2 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedVariantIds.includes(variant.variantId)}
-                        onChange={() => handleVariantToggle(variant.variantId)}
-                        className="rounded"
-                      />
-                      <span className="text-sm">{variant.name}</span>
-                    </label>
-                  ))}
+                    return (
+                      <div key={product._id} className="space-y-1">
+                        {/* Product row */}
+                        <div className="flex items-center gap-2 hover:bg-muted/50 p-2 rounded">
+                          <button
+                            type="button"
+                            onClick={() => toggleProductExpansion(product._id)}
+                            className="p-0.5 hover:bg-muted rounded"
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </button>
+                          <label className="flex items-center gap-2 cursor-pointer flex-1">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              ref={(el) => {
+                                if (el) {
+                                  el.indeterminate = isIndeterminate;
+                                }
+                              }}
+                              onChange={() => handleProductToggle(product._id)}
+                              className="rounded"
+                            />
+                            <span className="text-sm font-medium">{product.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({product.variants.length} variant{product.variants.length !== 1 ? 's' : ''})
+                            </span>
+                          </label>
+                        </div>
+
+                        {/* Variants (shown when expanded) */}
+                        {isExpanded && (
+                          <div className="ml-8 space-y-1 pl-2 border-l-2 border-muted">
+                            {product.variants.map((variant) => (
+                              <label
+                                key={variant._id}
+                                className="flex items-center gap-2 cursor-pointer p-1.5 hover:bg-muted/30 rounded"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={selectedVariantIds.includes(variant._id)}
+                                  onChange={() => handleVariantToggle(variant._id)}
+                                  className="rounded"
+                                />
+                                <span className="text-sm">{variant.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  €{variant.price.toFixed(2)}
+                                </span>
+                                <span className="text-xs text-muted-foreground ml-auto">
+                                  ({product.productId}-{variant.variantId})
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

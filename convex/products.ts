@@ -1,8 +1,11 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { requireAdmin } from "./auth";
+import type { QueryCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 
 const variantValidator = v.object({
+  _id: v.id("variants"),
   variantId: v.string(),
   name: v.string(),
   price: v.number(),
@@ -33,6 +36,26 @@ const productValidator = v.object({
   sortOrder: v.optional(v.number()),
   variants: v.array(variantValidator),
 });
+
+/**
+ * Helper function to load variants for a product from the variants table
+ */
+async function loadProductVariants(ctx: QueryCtx, productId: Id<"products">) {
+  const variants = await ctx.db
+    .query("variants")
+    .withIndex("by_product_id", (q) => q.eq("productId", productId))
+    .collect();
+  
+  return variants.map(v => ({
+    _id: v._id,
+    variantId: v.variantId,
+    name: v.name,
+    price: v.price,
+    maxQuantity: v.maxQuantity,
+    requiredAgreements: v.requiredAgreements,
+    customFields: v.customFields,
+  }));
+}
 
 const productWithStockValidator = v.object({
   _id: v.id("products"),
@@ -76,9 +99,11 @@ export const list = query({
       return orderA - orderB;
     });
 
-    // Fetch stock for all products
+    // Fetch variants and stock for all products
     const productsWithStock = await Promise.all(
       visibleProducts.map(async (product) => {
+        const variants = await loadProductVariants(ctx, product._id);
+        
         const stocks = await ctx.db
           .query("stock")
           .withIndex("by_product", (q) => q.eq("productId", product._id))
@@ -86,6 +111,7 @@ export const list = query({
 
         return {
           ...product,
+          variants,
           stock: stocks.map((stock) => ({
             _id: stock._id,
             variantId: stock.variantId,
@@ -105,7 +131,15 @@ export const getById = query({
   args: { id: v.id("products") },
   returns: v.union(productValidator, v.null()),
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.id);
+    const product = await ctx.db.get(args.id);
+    if (!product) return null;
+    
+    const variants = await loadProductVariants(ctx, product._id);
+    
+    return {
+      ...product,
+      variants,
+    };
   },
 });
 
@@ -119,11 +153,16 @@ export const getByProductId = query({
       .first();
     
     // Filter out hidden products for public users
-    if (product && product.isVisible === false) {
+    if (!product || product.isVisible === false) {
       return null;
     }
     
-    return product;
+    const variants = await loadProductVariants(ctx, product._id);
+    
+    return {
+      ...product,
+      variants,
+    };
   },
 });
 
@@ -170,7 +209,7 @@ export const create = mutation({
       throw new Error("Product ID already exists");
     }
 
-    const productId = await ctx.db.insert("products", {
+    const productDbId = await ctx.db.insert("products", {
       productId: args.productId,
       name: args.name,
       description: args.description,
@@ -179,20 +218,30 @@ export const create = mutation({
       gallery: args.gallery,
       isVirtual: args.isVirtual,
       isVisible: args.isVisible ?? true,
-      variants: args.variants,
     });
 
-    // Initialize stock for each variant
+    // Insert variants into variants table
     for (const variant of args.variants) {
+      await ctx.db.insert("variants", {
+        productId: productDbId,
+        variantId: variant.variantId,
+        name: variant.name,
+        price: variant.price,
+        maxQuantity: variant.maxQuantity,
+        requiredAgreements: variant.requiredAgreements,
+        customFields: variant.customFields,
+      });
+
+      // Initialize stock for each variant
       await ctx.db.insert("stock", {
-        productId,
+        productId: productDbId,
         variantId: variant.variantId,
         quantity: 0,
         reserved: 0,
       });
     }
 
-    return productId;
+    return productDbId;
   },
 });
 
@@ -257,27 +306,60 @@ export const update = mutation({
       gallery: args.gallery,
       isVirtual: args.isVirtual,
       isVisible: args.isVisible,
-      variants: args.variants,
     });
 
-    // Get existing stock entries
+    // Get existing variants and stock entries
+    const existingVariants = await ctx.db
+      .query("variants")
+      .withIndex("by_product_id", (q) => q.eq("productId", args.id))
+      .collect();
+    
     const existingStocks = await ctx.db
       .query("stock")
       .withIndex("by_product", (q) => q.eq("productId", args.id))
       .collect();
 
-    // Create a map of existing stock by variantId
+    // Create maps of existing data by variantId
+    const variantMap = new Map(
+      existingVariants.map((v) => [v.variantId, v])
+    );
     const stockMap = new Map(
       existingStocks.map((stock) => [stock.variantId, stock])
     );
 
-    // Update or create stock for each variant
+    // Track which variants are being kept
+    const keptVariantIds = new Set<string>();
+
+    // Update or create variants
     for (const variant of args.variants) {
-      const existingStock = stockMap.get(variant.variantId);
-      if (existingStock) {
-        // Variant already has stock entry, keep it
-        stockMap.delete(variant.variantId);
+      keptVariantIds.add(variant.variantId);
+      
+      const existingVariant = variantMap.get(variant.variantId);
+      if (existingVariant) {
+        // Update existing variant
+        await ctx.db.patch(existingVariant._id, {
+          name: variant.name,
+          price: variant.price,
+          maxQuantity: variant.maxQuantity,
+          requiredAgreements: variant.requiredAgreements,
+          customFields: variant.customFields,
+        });
       } else {
+        // Insert new variant
+        await ctx.db.insert("variants", {
+          productId: args.id,
+          variantId: variant.variantId,
+          name: variant.name,
+          price: variant.price,
+          maxQuantity: variant.maxQuantity,
+          requiredAgreements: variant.requiredAgreements,
+          customFields: variant.customFields,
+        });
+      }
+
+      // Handle stock
+      const existingStock = stockMap.get(variant.variantId);
+      if (!existingStock) {
         // New variant, create stock entry
         await ctx.db.insert("stock", {
           productId: args.id,
@@ -288,9 +370,17 @@ export const update = mutation({
       }
     }
 
-    // Remove stock entries for deleted variants
-    for (const [, stock] of stockMap) {
-      await ctx.db.delete(stock._id);
+    // Remove variants and stock entries that are no longer in the product
+    for (const variant of existingVariants) {
+      if (!keptVariantIds.has(variant.variantId)) {
+        await ctx.db.delete(variant._id);
+      }
+    }
+    
+    for (const stock of existingStocks) {
+      if (!keptVariantIds.has(stock.variantId)) {
+        await ctx.db.delete(stock._id);
+      }
     }
 
     return null;
@@ -306,6 +396,16 @@ export const remove = mutation({
     const product = await ctx.db.get(args.id);
     if (!product) {
       throw new Error("Product not found");
+    }
+
+    // Delete all variants for this product
+    const variants = await ctx.db
+      .query("variants")
+      .withIndex("by_product_id", (q) => q.eq("productId", args.id))
+      .collect();
+    
+    for (const variant of variants) {
+      await ctx.db.delete(variant._id);
     }
 
     // Delete all stock entries for this product
@@ -343,9 +443,11 @@ export const listAll = query({
       return orderA - orderB;
     });
 
-    // Fetch stock for all products
+    // Fetch variants and stock for all products
     const productsWithStock = await Promise.all(
       products.map(async (product) => {
+        const variants = await loadProductVariants(ctx, product._id);
+        
         const stocks = await ctx.db
           .query("stock")
           .withIndex("by_product", (q) => q.eq("productId", product._id))
@@ -353,6 +455,7 @@ export const listAll = query({
 
         return {
           ...product,
+          variants,
           stock: stocks.map((stock) => ({
             _id: stock._id,
             variantId: stock.variantId,

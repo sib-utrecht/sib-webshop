@@ -1,7 +1,7 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useParams, useNavigate } from "react-router-dom";
-import { Id } from "../../convex/_generated/dataModel";
+import type { Id } from "../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Download } from "lucide-react";
 import {
@@ -38,25 +38,32 @@ export function ViewDetailPage() {
   const { viewId } = useParams<{ viewId: string }>();
   const navigate = useNavigate();
   
-  const view = useQuery(
-    api.views.get,
-    viewId ? { viewId: viewId as Id<"views"> } : "skip"
-  );
+  // Validate ID format - Convex IDs are 32 chars, lowercase alphanumeric
+  const isValidId = viewId && /^[a-z0-9]{32}$/.test(viewId);
   
-  const rows = useQuery(
-    api.views.execute,
-    viewId ? { viewId: viewId as Id<"views"> } : "skip"
-  );
-
-  if (!viewId) {
+  // Show error for invalid ID format before calling useQuery
+  if (!isValidId) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="text-center text-destructive">Invalid view ID</div>
+        <div className="text-center">
+          <p className="text-destructive text-lg font-semibold mb-4">Invalid view ID</p>
+          <Button variant="outline" onClick={() => navigate("/views")}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Views
+          </Button>
+        </div>
       </div>
     );
   }
+  
+  // At this point, viewId is guaranteed to be valid
+  const view = useQuery(api.views.get, { viewId: viewId as Id<"views"> });
+  const rows = useQuery(
+    api.views.execute,
+    view !== null ? { viewId: viewId as Id<"views"> } : "skip"
+  );
 
-  if (view === undefined || rows === undefined) {
+  if (view === undefined) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center text-muted-foreground">Loading view...</div>
@@ -67,7 +74,25 @@ export function ViewDetailPage() {
   if (view === null) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="text-center text-destructive">View not found</div>
+        <div className="text-center">
+          <p className="text-destructive text-lg font-semibold mb-2">View not found</p>
+          <p className="text-muted-foreground mb-4">This view may have been deleted.</p>
+          <Button
+            variant="outline"
+            onClick={() => navigate("/views")}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Views
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (rows === undefined) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center text-muted-foreground">Loading data...</div>
       </div>
     );
   }
@@ -111,8 +136,16 @@ export function ViewDetailPage() {
         return `€${row.price.toFixed(2)}`;
       case "itemTotal":
         return `€${row.itemTotal.toFixed(2)}`;
-      default:
-        return row[columnId] ?? "-";
+      default: {
+        const value = row[columnId as keyof OrderItemRow];
+        if (value === null || value === undefined) {
+          return "-";
+        }
+        if (typeof value === "object") {
+          return JSON.stringify(value);
+        }
+        return String(value);
+      }
     }
   };
 

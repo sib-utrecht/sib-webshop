@@ -4,8 +4,7 @@ import { requireAdmin } from "./auth";
 
 // Validator for view filters
 const viewFiltersValidator = v.optional(v.object({
-  productIds: v.optional(v.array(v.id("products"))),
-  variantIds: v.optional(v.array(v.string())),
+  variantIds: v.optional(v.array(v.id("variants"))),
   statuses: v.optional(v.array(v.string())),
 }));
 
@@ -183,17 +182,26 @@ export const execute = query({
       }))
     );
     
-    // Apply product/variant filters
+    // Apply variant filter using variant database IDs
     let filteredRows = rows;
-    if (view.filters?.productIds && view.filters.productIds.length > 0) {
-      filteredRows = filteredRows.filter(row => 
-        view.filters?.productIds?.includes(row.productId)
-      );
-    }
     if (view.filters?.variantIds && view.filters.variantIds.length > 0) {
-      filteredRows = filteredRows.filter(row => 
-        view.filters?.variantIds?.includes(row.variantId)
-      );
+      // Create a map of variant IDs to their productId-variantId for quick lookup
+      const variantIdSet = new Set(view.filters.variantIds);
+      const variantMap = new Map<string, boolean>();
+      
+      // Load all the filtered variants to get their productId and variantId
+      for (const variantDbId of view.filters.variantIds) {
+        const variant = await ctx.db.get(variantDbId);
+        if (variant) {
+          const key = `${variant.productId}-${variant.variantId}`;
+          variantMap.set(key, true);
+        }
+      }
+      
+      filteredRows = filteredRows.filter(row => {
+        const compositeKey = `${row.productId}-${row.variantId}`;
+        return variantMap.has(compositeKey);
+      });
     }
     
     // Apply sorting
@@ -210,7 +218,16 @@ export const execute = query({
         
         // Access the field directly by name
         const value = row[fieldName as keyof typeof row];
-        return value !== undefined && value !== null ? value : "";
+        
+        // Convert value to string or number
+        if (value === undefined || value === null) {
+          return "";
+        }
+        if (typeof value === "string" || typeof value === "number") {
+          return value;
+        }
+        // Convert other types (Id, Record) to string
+        return String(value);
       };
       
       filteredRows.sort((a, b) => {

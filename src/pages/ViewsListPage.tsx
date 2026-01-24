@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Eye, Plus, Trash2, Table as TableIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { Id } from "../../convex/_generated/dataModel";
+import type { Id } from "../../convex/_generated/dataModel";
 
 export function ViewsListPage() {
   const views = useQuery(api.views.list);
@@ -93,10 +93,10 @@ export function ViewsListPage() {
                   <div>
                     <span className="font-medium">Columns:</span> {view.columns.length}
                   </div>
-                  {view.filters?.productIds && view.filters.productIds.length > 0 && (
+                  {view.filters?.variantIds && view.filters.variantIds.length > 0 && (
                     <div>
-                      <span className="font-medium">Products filtered:</span>{" "}
-                      {view.filters.productIds.length}
+                      <span className="font-medium">Variants filtered:</span>{" "}
+                      {view.filters.variantIds.length}
                     </div>
                   )}
                   {view.sortBy && (
