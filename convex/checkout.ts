@@ -68,6 +68,37 @@ export const createOrder = internalMutation({
       }
     }
 
+    // Reserve stock for all items before creating the order
+    const reservedItems: Array<{ productId: any; variantId: string; quantity: number }> = [];
+    for (const item of args.items) {
+      const reserveResult = await ctx.runMutation(internal.stock.reserveStock, {
+        productId: item.productId,
+        variantId: item.variantId,
+        quantity: item.quantity,
+      });
+
+      if (!reserveResult || !reserveResult.success) {
+        // Rollback: release all previously reserved stock
+        for (const reserved of reservedItems) {
+          await ctx.runMutation(internal.stock.releaseStock, {
+            productId: reserved.productId,
+            variantId: reserved.variantId,
+            quantity: reserved.quantity,
+          });
+        }
+        return {
+          success: false,
+          message: reserveResult?.message || "Failed to reserve stock",
+        };
+      }
+
+      reservedItems.push({
+        productId: item.productId,
+        variantId: item.variantId,
+        quantity: item.quantity,
+      });
+    }
+
     // Generate order ID with year and month (e.g., SIB-2026-01-ABC123)
     // Add _TEST suffix if this is a test order (name contains "TEST")
     const now = new Date();
@@ -252,32 +283,24 @@ export const updateOrderStatus = internalMutation({
       status: args.status === "paid" ? "paid" : order.status,
     });
 
-    // If payment is successful, decrement stock
+    // Handle stock based on payment status
     if (args.status === "paid") {
+      // Payment successful: confirm purchase (decrement quantity and release reservation)
       for (const item of order.items) {
-        const variant = await ctx.db
-          .query("variants")
-          .withIndex("by_product_variant", (q) =>
-            q.eq("productId", item.productId).eq("variantId", item.variantId)
-          )
-          .first();
-
-        if (variant) {
-          await ctx.db.patch(variant._id, {
-            quantity: variant.quantity - item.quantity,
-          });
-
-          // Also decrement secondary stock if it exists
-          if (variant.secondaryStock) {
-            const secondaryVariant = await ctx.db.get(variant.secondaryStock);
-            if (secondaryVariant) {
-              const factor = variant.secondaryStockFactor ?? 1;
-              await ctx.db.patch(secondaryVariant._id, {
-                quantity: secondaryVariant.quantity - (item.quantity * factor),
-              });
-            }
-          }
-        }
+        await ctx.runMutation(internal.stock.confirmPurchase, {
+          productId: item.productId,
+          variantId: item.variantId,
+          quantity: item.quantity,
+        });
+      }
+    } else if (args.status === "expired" || args.status === "failed" || args.status === "canceled") {
+      // Payment failed/expired/canceled: release reserved stock
+      for (const item of order.items) {
+        await ctx.runMutation(internal.stock.releaseStock, {
+          productId: item.productId,
+          variantId: item.variantId,
+          quantity: item.quantity,
+        });
       }
     }
 
