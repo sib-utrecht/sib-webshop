@@ -269,6 +269,15 @@ export const releaseExpiredReservations = internalMutation({
           .first();
 
         if (variant) {
+          // Log if we detect inconsistent reserved stock
+          if (variant.reserved < item.quantity) {
+            console.warn(
+              `Stock inconsistency detected for order ${order.orderId}: ` +
+              `variant ${variant._id} has reserved=${variant.reserved} but order item quantity=${item.quantity}. ` +
+              `This may indicate a race condition or double-processing.`
+            );
+          }
+
           await ctx.db.patch(variant._id, {
             reserved: Math.max(0, variant.reserved - item.quantity),
           });
@@ -278,8 +287,19 @@ export const releaseExpiredReservations = internalMutation({
             const secondaryVariant = await ctx.db.get(variant.secondaryStock);
             if (secondaryVariant) {
               const factor = variant.secondaryStockFactor ?? 1;
+              const secondaryQuantity = item.quantity * factor;
+
+              // Log if we detect inconsistent reserved stock for secondary
+              if (secondaryVariant.reserved < secondaryQuantity) {
+                console.warn(
+                  `Secondary stock inconsistency detected for order ${order.orderId}: ` +
+                  `secondary variant ${secondaryVariant._id} has reserved=${secondaryVariant.reserved} ` +
+                  `but needs to release ${secondaryQuantity}. This may indicate a race condition or double-processing.`
+                );
+              }
+
               await ctx.db.patch(secondaryVariant._id, {
-                reserved: Math.max(0, secondaryVariant.reserved - (item.quantity * factor)),
+                reserved: Math.max(0, secondaryVariant.reserved - secondaryQuantity),
               });
             }
           }
