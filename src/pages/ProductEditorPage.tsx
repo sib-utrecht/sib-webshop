@@ -806,7 +806,14 @@ export function ProductEditorPage() {
                       >
                         <option value="">None - independent stock</option>
                         {editingProduct.variants
-                          .filter((v) => v.variantId !== variant.variantId)
+                          .filter((v) => {
+                            // Prevent self-reference
+                            if (v.variantId === variant.variantId) return false;
+                            // Prevent circular reference: don't allow selecting a variant
+                            // that already references this variant as its secondary stock
+                            if (v.secondaryStockVariantId === variant.variantId) return false;
+                            return true;
+                          })
                           .map((v) => (
                             <option key={v.variantId} value={v.variantId}>
                               {v.name} ({v.variantId})
