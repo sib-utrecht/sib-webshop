@@ -3,6 +3,9 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -18,9 +21,14 @@ import type { Id } from "../../convex/_generated/dataModel";
 export function ViewsListPage() {
   const views = useQuery(api.views.list);
   const removeView = useMutation(api.views.remove);
+  const createView = useMutation(api.views.create);
   const navigate = useNavigate();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [viewToDelete, setViewToDelete] = useState<Id<"views"> | null>(null);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [newViewName, setNewViewName] = useState("");
+  const [newViewDescription, setNewViewDescription] = useState("");
+  const [creating, setCreating] = useState(false);
 
   const handleDeleteClick = (viewId: Id<"views">) => {
     setViewToDelete(viewId);
@@ -32,6 +40,32 @@ export function ViewsListPage() {
       await removeView({ viewId: viewToDelete });
       setDeleteDialogOpen(false);
       setViewToDelete(null);
+    }
+  };
+
+  const handleCreateClick = () => {
+    setNewViewName("");
+    setNewViewDescription("");
+    setCreateDialogOpen(true);
+  };
+
+  const handleCreateConfirm = async () => {
+    if (!newViewName.trim()) return;
+    
+    setCreating(true);
+    try {
+      const viewId = await createView({
+        name: newViewName.trim(),
+        description: newViewDescription.trim() || undefined,
+        columns: ["orderId", "email", "productName", "variantName", "quantity"],
+        filters: {},
+        sortBy: undefined,
+        sortOrder: undefined,
+      });
+      setCreateDialogOpen(false);
+      navigate(`/views/${viewId}`);
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -52,7 +86,7 @@ export function ViewsListPage() {
             Create custom views to filter and display order data
           </p>
         </div>
-        <Button onClick={() => navigate("/views/new")}>
+        <Button onClick={handleCreateClick}>
           <Plus className="h-4 w-4 mr-2" />
           New View
         </Button>
@@ -66,66 +100,47 @@ export function ViewsListPage() {
             <p className="text-muted-foreground text-center max-w-sm mb-6">
               Create your first view to organize and filter order data in a table format.
             </p>
-            <Button onClick={() => navigate("/views/new")}>
+            <Button onClick={handleCreateClick}>
               <Plus className="h-4 w-4 mr-2" />
               Create First View
             </Button>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-3">
           {views.map((view) => (
-            <Card key={view._id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex items-start justify-between">
+            <Card 
+              key={view._id} 
+              className="hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => navigate(`/views/${view._id}`)}
+            >
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <CardTitle className="truncate">{view.name}</CardTitle>
-                    {view.description && (
-                      <CardDescription className="mt-2">
-                        {view.description}
-                      </CardDescription>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 text-sm text-muted-foreground mb-4">
-                  <div>
-                    <span className="font-medium">Columns:</span> {view.columns.length}
-                  </div>
-                  {view.filters?.variantIds && view.filters.variantIds.length > 0 && (
-                    <div>
-                      <span className="font-medium">Variants filtered:</span>{" "}
-                      {view.filters.variantIds.length}
+                    <h3 className="font-semibold text-lg truncate mb-1">{view.name}</h3>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span>
+                        <span className="font-medium">{view.columns.length}</span> columns
+                      </span>
+                      {view.filters?.variantIds && view.filters.variantIds.length > 0 && (
+                        <span>
+                          <span className="font-medium">{view.filters.variantIds.length}</span> variants filtered
+                        </span>
+                      )}
+                      {view.sortBy && (
+                        <span>
+                          Sorted by <span className="font-medium">{view.sortBy}</span>
+                        </span>
+                      )}
                     </div>
-                  )}
-                  {view.sortBy && (
-                    <div>
-                      <span className="font-medium">Sorted by:</span> {view.sortBy}
-                    </div>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => navigate(`/views/${view._id}`)}
-                  >
-                    <Eye className="h-4 w-4 mr-2" />
-                    View
-                  </Button>
+                  </div>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => navigate(`/views/${view._id}/edit`)}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDeleteClick(view._id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteClick(view._id);
+                    }}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -135,6 +150,59 @@ export function ViewsListPage() {
           ))}
         </div>
       )}
+
+      {/* Create View Dialog */}
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New View</DialogTitle>
+            <DialogDescription>
+              Give your view a name and description. You'll be able to configure columns and filters after creation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="viewName">View Name *</Label>
+              <Input
+                id="viewName"
+                value={newViewName}
+                onChange={(e) => setNewViewName(e.target.value)}
+                placeholder="e.g., Gala Ticket Orders"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newViewName.trim()) {
+                    handleCreateConfirm();
+                  }
+                }}
+              />
+            </div>
+            <div>
+              <Label htmlFor="viewDescription">Description</Label>
+              <Textarea
+                id="viewDescription"
+                value={newViewDescription}
+                onChange={(e) => setNewViewDescription(e.target.value)}
+                placeholder="Optional description"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCreateDialogOpen(false)}
+              disabled={creating}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateConfirm}
+              disabled={!newViewName.trim() || creating}
+            >
+              {creating ? "Creating..." : "Create View"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

@@ -64,7 +64,6 @@ export const create = mutation({
     
     const viewId = await ctx.db.insert("views", {
       name: args.name,
-      description: args.description,
       columns: args.columns,
       filters: args.filters,
       sortBy: args.sortBy,
@@ -94,7 +93,6 @@ export const update = mutation({
     
     await ctx.db.patch(args.viewId, {
       name: args.name,
-      description: args.description,
       columns: args.columns,
       filters: args.filters,
       sortBy: args.sortBy,

@@ -104,7 +104,6 @@ export default defineSchema({
 
   views: defineTable({
     name: v.string(),
-    description: v.optional(v.string()),
     columns: v.array(v.string()), // Column IDs to display (e.g., ["email", "productName", "variantName", "customField_fieldId"])
     filters: v.optional(v.object({
       variantIds: v.optional(v.array(v.id("variants"))), // Variant database IDs

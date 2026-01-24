@@ -12,7 +12,6 @@ import { LoginPage } from "@/pages/LoginPage";
 import { DebugPage } from "@/pages/DebugPage";
 import { ViewsListPage } from "@/pages/ViewsListPage";
 import { ViewDetailPage } from "@/pages/ViewDetailPage";
-import { ViewEditorPage } from "@/pages/ViewEditorPage";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 function App() {
@@ -60,26 +59,10 @@ function App() {
             }
           />
           <Route
-            path="/views/new"
-            element={
-              <ProtectedRoute>
-                <ViewEditorPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/views/:viewId"
             element={
               <ProtectedRoute>
                 <ViewDetailPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/views/:viewId/edit"
-            element={
-              <ProtectedRoute>
-                <ViewEditorPage />
               </ProtectedRoute>
             }
           />
