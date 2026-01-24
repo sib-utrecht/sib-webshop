@@ -1,6 +1,8 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { requireAdmin } from "./auth";
+import { Doc } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 
 // Generate a secure random token for sharing
 function generateShareToken(): string {
@@ -147,14 +149,15 @@ const orderItemRowValidator = v.object({
 });
 
 /**
- * Execute a view and return flattened order items (admin only)
+ * Internal query to execute a view given a view object
+ * This is the shared logic used by both execute and executeByShareToken
  */
-export const execute = query({
-  args: { viewId: v.id("views") },
+export const executeViewInternal = internalQuery({
+  args: { 
+    viewId: v.id("views"),
+  },
   returns: v.array(orderItemRowValidator),
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
-    
     const view = await ctx.db.get(args.viewId);
     if (!view) {
       throw new Error("View not found");
@@ -258,6 +261,24 @@ export const execute = query({
 });
 
 /**
+ * Execute a view and return flattened order items (admin only)
+ */
+export const execute = query({
+  args: { viewId: v.id("views") },
+  returns: v.array(orderItemRowValidator),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    
+    const view = await ctx.db.get(args.viewId);
+    if (!view) {
+      throw new Error("View not found");
+    }
+    
+    return await ctx.runQuery(internal.views.executeViewInternal, { viewId: args.viewId });
+  },
+});
+
+/**
  * Generate or regenerate a share token for a view (admin only)
  */
 export const generateShareToken = mutation({
@@ -332,99 +353,6 @@ export const executeByShareToken = query({
       throw new Error("View not found or sharing is disabled");
     }
     
-    // Get all orders
-    let orders = await ctx.db.query("orders").order("desc").collect();
-    
-    // Apply status filter if specified
-    if (view.filters?.statuses && view.filters.statuses.length > 0) {
-      orders = orders.filter(order => 
-        view.filters?.statuses?.includes(order.status)
-      );
-    }
-    
-    // Flatten orders into rows (one per cart item)
-    const rows = orders.flatMap(order => 
-      order.items.map((item, itemIndex) => ({
-        orderId: order.orderId,
-        orderDbId: order._id,
-        orderCreationTime: order._creationTime,
-        email: order.email,
-        name: order.name,
-        orderStatus: order.status,
-        productId: item.productId,
-        productName: item.productName,
-        variantId: item.variantId,
-        variantName: item.variantName,
-        quantity: item.quantity,
-        price: item.price,
-        itemTotal: item.price * item.quantity,
-        customFieldResponses: item.customFieldResponses,
-        itemIndex,
-      }))
-    );
-    
-    // Apply variant filter using variant database IDs
-    let filteredRows = rows;
-    if (view.filters?.variantIds && view.filters.variantIds.length > 0) {
-      // Create a map of variant IDs to their productId-variantId for quick lookup
-      const variantIdSet = new Set(view.filters.variantIds);
-      const variantMap = new Map<string, boolean>();
-      
-      // Load all the filtered variants to get their productId and variantId
-      for (const variantDbId of view.filters.variantIds) {
-        const variant = await ctx.db.get(variantDbId);
-        if (variant) {
-          const key = `${variant.productId}-${variant.variantId}`;
-          variantMap.set(key, true);
-        }
-      }
-      
-      filteredRows = filteredRows.filter(row => {
-        const compositeKey = `${row.productId}-${row.variantId}`;
-        return variantMap.has(compositeKey);
-      });
-    }
-    
-    // Apply sorting
-    if (view.sortBy) {
-      const sortOrder = view.sortOrder || "asc";
-      
-      // Helper function to get field value by name
-      const getFieldValue = (row: typeof filteredRows[0], fieldName: string): string | number => {
-        // Check if it's a custom field
-        if (fieldName.startsWith("customField_")) {
-          const fieldId = fieldName.substring("customField_".length);
-          return row.customFieldResponses?.[fieldId] || "";
-        }
-        
-        // Access the field directly by name
-        const value = row[fieldName as keyof typeof row];
-        
-        // Convert value to string or number
-        if (value === undefined || value === null) {
-          return "";
-        }
-        if (typeof value === "string" || typeof value === "number") {
-          return value;
-        }
-        // Convert other types (Id, Record) to string
-        return String(value);
-      };
-      
-      filteredRows.sort((a, b) => {
-        const aValue = getFieldValue(a, view.sortBy!);
-        const bValue = getFieldValue(b, view.sortBy!);
-        
-        // Compare values
-        if (typeof aValue === "number" && typeof bValue === "number") {
-          return sortOrder === "asc" ? aValue - bValue : bValue - aValue;
-        } else {
-          const comparison = String(aValue).localeCompare(String(bValue));
-          return sortOrder === "asc" ? comparison : -comparison;
-        }
-      });
-    }
-    
-    return filteredRows;
+    return await ctx.runQuery(internal.views.executeViewInternal, { viewId: view._id });
   },
 });
