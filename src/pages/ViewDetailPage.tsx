@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDateTime } from "@/lib/utils";
+import { buildShareUrl } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
   Popover,
@@ -334,7 +335,7 @@ export function ViewDetailPage() {
 
   const handleCopyShareLink = () => {
     if (!view?.shareToken) return;
-    const shareUrl = `${window.location.origin}/shared/${view.shareToken}`;
+    const shareUrl = buildShareUrl(view.shareToken);
     navigator.clipboard.writeText(shareUrl);
     setCopiedToClipboard(true);
     setTimeout(() => setCopiedToClipboard(false), 2000);
@@ -544,7 +545,7 @@ export function ViewDetailPage() {
                 <div className="flex gap-2 mt-2">
                   <Input
                     id="shareUrl"
-                    value={`${window.location.origin}/shared/${view.shareToken}`}
+                    value={view.shareToken ? buildShareUrl(view.shareToken) : ""}
                     readOnly
                     className="font-mono text-sm"
                   />

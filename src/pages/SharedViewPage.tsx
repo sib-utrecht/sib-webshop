@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, isValidShareToken } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
 // Type for flattened order item row (matching the validator in convex/views.ts)
@@ -51,12 +51,12 @@ const AVAILABLE_COLUMNS = [
 export function SharedViewPage() {
   const { shareToken } = useParams<{ shareToken: string }>();
   
-  // Validate token format - should be 32 chars, lowercase alphanumeric
-  const isValidToken = shareToken && /^[a-z0-9]{32}$/.test(shareToken);
+  // Validate token format
+  const isValidToken = isValidShareToken(shareToken);
   
   const view = useQuery(
     api.views.getByShareToken,
-    isValidToken ? { shareToken } : "skip"
+    isValidToken ? { shareToken: shareToken! } : "skip"
   );
   
   const rows = useQuery(
