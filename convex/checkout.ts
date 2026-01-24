@@ -1,6 +1,7 @@
 import { mutation, internalMutation, action } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import { getAvailableStock } from "./stockHelpers";
 
 /**
  * Create an order (internal use - called by processCheckout action)
@@ -56,7 +57,8 @@ export const createOrder = internalMutation({
         };
       }
 
-      const available = variant.quantity - variant.reserved;
+      const available = await getAvailableStock(variant, (id) => ctx.db.get(id));
+
       if (available < item.quantity) {
         const product = await ctx.db.get(item.productId);
         return {
@@ -264,6 +266,17 @@ export const updateOrderStatus = internalMutation({
           await ctx.db.patch(variant._id, {
             quantity: variant.quantity - item.quantity,
           });
+
+          // Also decrement secondary stock if it exists
+          if (variant.secondaryStock) {
+            const secondaryVariant = await ctx.db.get(variant.secondaryStock);
+            if (secondaryVariant) {
+              const factor = variant.secondaryStockFactor ?? 1;
+              await ctx.db.patch(secondaryVariant._id, {
+                quantity: secondaryVariant.quantity - (item.quantity * factor),
+              });
+            }
+          }
         }
       }
     }

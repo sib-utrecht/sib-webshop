@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { requireAdmin } from "./auth";
 import type { QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { getAvailableStock } from "./stockHelpers";
 
 const variantValidator = v.object({
   _id: v.id("variants"),
@@ -23,6 +24,8 @@ const variantValidator = v.object({
   quantity: v.number(),
   reserved: v.number(),
   available: v.number(),
+  secondaryStock: v.optional(v.id("variants")),
+  secondaryStockFactor: v.optional(v.number()),
 });
 
 const productValidator = v.object({
@@ -49,18 +52,28 @@ async function loadProductVariants(ctx: QueryCtx, productId: Id<"products">) {
     .withIndex("by_product_id", (q) => q.eq("productId", productId))
     .collect();
   
-  return variants.map(v => ({
-    _id: v._id,
-    variantId: v.variantId,
-    name: v.name,
-    price: v.price,
-    maxQuantity: v.maxQuantity,
-    requiredAgreements: v.requiredAgreements,
-    customFields: v.customFields,
-    quantity: v.quantity,
-    reserved: v.reserved,
-    available: v.quantity - v.reserved,
-  }));
+  // Calculate available stock considering secondary stock for each variant
+  const result = [];
+  for (const v of variants) {
+    const available = await getAvailableStock(v, (id) => ctx.db.get(id));
+
+    result.push({
+      _id: v._id,
+      variantId: v.variantId,
+      name: v.name,
+      price: v.price,
+      maxQuantity: v.maxQuantity,
+      requiredAgreements: v.requiredAgreements,
+      customFields: v.customFields,
+      quantity: v.quantity,
+      reserved: v.reserved,
+      available,
+      secondaryStock: v.secondaryStock,
+      secondaryStockFactor: v.secondaryStockFactor,
+    });
+  }
+  
+  return result;
 }
 
 const productWithStockValidator = v.object({
@@ -175,6 +188,8 @@ export const create = mutation({
             placeholder: v.optional(v.string()),
           })
         )),
+        secondaryStockVariantId: v.optional(v.string()),
+        secondaryStockFactor: v.optional(v.number()),
       })
     ),
   },
@@ -249,6 +264,8 @@ export const update = mutation({
             placeholder: v.optional(v.string()),
           })
         )),
+        secondaryStockVariantId: v.optional(v.string()),
+        secondaryStockFactor: v.optional(v.number()),
       })
     ),
   },
@@ -299,7 +316,7 @@ export const update = mutation({
     // Track which variants are being kept
     const keptVariantIds = new Set<string>();
 
-    // Update or create variants
+    // First pass: Update or create variants without secondaryStock
     for (const variant of args.variants) {
       keptVariantIds.add(variant.variantId);
       
@@ -326,6 +343,40 @@ export const update = mutation({
           quantity: 0,
           reserved: 0,
         });
+      }
+    }
+
+    // Second pass: Update secondaryStock references
+    // Need to fetch all variants again to get the updated/created IDs
+    const allVariants = await ctx.db
+      .query("variants")
+      .withIndex("by_product_id", (q) => q.eq("productId", args.id))
+      .collect();
+    
+    const variantIdToDbId = new Map(
+      allVariants.map((v) => [v.variantId, v._id])
+    );
+
+    for (const variant of args.variants) {
+      if (variant.secondaryStockVariantId) {
+        const secondaryStockDbId = variantIdToDbId.get(variant.secondaryStockVariantId);
+        const currentVariantDbId = variantIdToDbId.get(variant.variantId);
+        
+        if (secondaryStockDbId && currentVariantDbId) {
+          await ctx.db.patch(currentVariantDbId, {
+            secondaryStock: secondaryStockDbId,
+            secondaryStockFactor: variant.secondaryStockFactor ?? 1,
+          });
+        }
+      } else {
+        // Clear secondaryStock if not set
+        const currentVariantDbId = variantIdToDbId.get(variant.variantId);
+        if (currentVariantDbId) {
+          await ctx.db.patch(currentVariantDbId, {
+            secondaryStock: undefined,
+            secondaryStockFactor: undefined,
+          });
+        }
       }
     }
 

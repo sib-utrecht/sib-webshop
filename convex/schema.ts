@@ -51,6 +51,8 @@ export default defineSchema({
     )),
     quantity: v.number(),
     reserved: v.number(), // Items in carts but not yet purchased
+    secondaryStock: v.optional(v.id("variants")), // Reference to another variant that shares the same stock
+    secondaryStockFactor: v.optional(v.number()), // How many units of secondary stock to decrement (default 1)
   })
     .index("by_product_id", ["productId"])
     .index("by_product_variant", ["productId", "variantId"]),

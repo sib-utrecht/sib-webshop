@@ -1,6 +1,7 @@
-import { query, mutation, internalMutation } from "./_generated/server";
+import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { requireAdmin } from "./auth";
+import { getAvailableStock } from "./stockHelpers";
 
 export const getStock = query({
   args: { productId: v.id("products"), variantId: v.string() },
@@ -26,6 +27,8 @@ export const getStock = query({
 
     if (!variant) return null;
 
+    const available = await getAvailableStock(variant, (id) => ctx.db.get(id));
+
     return {
       _id: variant._id,
       _creationTime: variant._creationTime,
@@ -33,7 +36,7 @@ export const getStock = query({
       variantId: variant.variantId,
       quantity: variant.quantity,
       reserved: variant.reserved,
-      available: variant.quantity - variant.reserved,
+      available,
     };
   },
 });
@@ -52,20 +55,29 @@ export const getAllStock = query({
     })
   ),
   handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+
     const variants = await ctx.db
       .query("variants")
       .withIndex("by_product_id", (q) => q.eq("productId", args.productId))
       .collect();
 
-    return variants.map((variant) => ({
-      _id: variant._id,
-      _creationTime: variant._creationTime,
-      productId: variant.productId,
-      variantId: variant.variantId,
-      quantity: variant.quantity,
-      reserved: variant.reserved,
-      available: variant.quantity - variant.reserved,
-    }));
+    const result = [];
+    for (const variant of variants) {
+      const available = await getAvailableStock(variant, (id) => ctx.db.get(id));
+
+      result.push({
+        _id: variant._id,
+        _creationTime: variant._creationTime,
+        productId: variant.productId,
+        variantId: variant.variantId,
+        quantity: variant.quantity,
+        reserved: variant.reserved,
+        available,
+      });
+    }
+
+    return result;
   },
 });
 
@@ -95,7 +107,7 @@ export const updateStock = mutation({
   },
 });
 
-export const reserveStock = mutation({
+export const reserveStock = internalMutation({
   args: {
     productId: v.id("products"),
     variantId: v.string(),
@@ -117,7 +129,8 @@ export const reserveStock = mutation({
       return { success: false, message: "Variant not found" };
     }
 
-    const available = variant.quantity - variant.reserved;
+    const available = await getAvailableStock(variant, (id) => ctx.db.get(id));
+
     if (available < args.quantity) {
       return {
         success: false,
@@ -129,11 +142,22 @@ export const reserveStock = mutation({
       reserved: variant.reserved + args.quantity,
     });
 
+    // Also reserve secondary stock if it exists
+    if (variant.secondaryStock) {
+      const secondaryVariant = await ctx.db.get(variant.secondaryStock);
+      if (secondaryVariant) {
+        const factor = variant.secondaryStockFactor ?? 1;
+        await ctx.db.patch(secondaryVariant._id, {
+          reserved: secondaryVariant.reserved + (args.quantity * factor),
+        });
+      }
+    }
+
     return { success: true, message: "Stock reserved" };
   },
 });
 
-export const releaseStock = mutation({
+export const releaseStock = internalMutation({
   args: {
     productId: v.id("products"),
     variantId: v.string(),
@@ -153,6 +177,17 @@ export const releaseStock = mutation({
     await ctx.db.patch(variant._id, {
       reserved: Math.max(0, variant.reserved - args.quantity),
     });
+
+    // Also release secondary stock if it exists
+    if (variant.secondaryStock) {
+      const secondaryVariant = await ctx.db.get(variant.secondaryStock);
+      if (secondaryVariant) {
+        const factor = variant.secondaryStockFactor ?? 1;
+        await ctx.db.patch(secondaryVariant._id, {
+          reserved: Math.max(0, secondaryVariant.reserved - (args.quantity * factor)),
+        });
+      }
+    }
 
     return null;
   },
@@ -179,6 +214,18 @@ export const confirmPurchase = internalMutation({
       quantity: variant.quantity - args.quantity,
       reserved: Math.max(0, variant.reserved - args.quantity),
     });
+
+    // Also decrement secondary stock if it exists
+    if (variant.secondaryStock) {
+      const secondaryVariant = await ctx.db.get(variant.secondaryStock);
+      if (secondaryVariant) {
+        const factor = variant.secondaryStockFactor ?? 1;
+        await ctx.db.patch(secondaryVariant._id, {
+          quantity: secondaryVariant.quantity - (args.quantity * factor),
+          reserved: Math.max(0, secondaryVariant.reserved - (args.quantity * factor)),
+        });
+      }
+    }
 
     return null;
   },
