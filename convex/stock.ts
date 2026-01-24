@@ -6,7 +6,7 @@ export const getStock = query({
   args: { productId: v.id("products"), variantId: v.string() },
   returns: v.union(
     v.object({
-      _id: v.id("stock"),
+      _id: v.id("variants"),
       _creationTime: v.number(),
       productId: v.id("products"),
       variantId: v.string(),
@@ -17,18 +17,23 @@ export const getStock = query({
     v.null()
   ),
   handler: async (ctx, args) => {
-    const stock = await ctx.db
-      .query("stock")
+    const variant = await ctx.db
+      .query("variants")
       .withIndex("by_product_variant", (q) =>
         q.eq("productId", args.productId).eq("variantId", args.variantId)
       )
       .first();
 
-    if (!stock) return null;
+    if (!variant) return null;
 
     return {
-      ...stock,
-      available: stock.quantity - stock.reserved,
+      _id: variant._id,
+      _creationTime: variant._creationTime,
+      productId: variant.productId,
+      variantId: variant.variantId,
+      quantity: variant.quantity,
+      reserved: variant.reserved,
+      available: variant.quantity - variant.reserved,
     };
   },
 });
@@ -37,7 +42,7 @@ export const getAllStock = query({
   args: { productId: v.id("products") },
   returns: v.array(
     v.object({
-      _id: v.id("stock"),
+      _id: v.id("variants"),
       _creationTime: v.number(),
       productId: v.id("products"),
       variantId: v.string(),
@@ -47,14 +52,19 @@ export const getAllStock = query({
     })
   ),
   handler: async (ctx, args) => {
-    const stocks = await ctx.db
-      .query("stock")
-      .withIndex("by_product", (q) => q.eq("productId", args.productId))
+    const variants = await ctx.db
+      .query("variants")
+      .withIndex("by_product_id", (q) => q.eq("productId", args.productId))
       .collect();
 
-    return stocks.map((stock) => ({
-      ...stock,
-      available: stock.quantity - stock.reserved,
+    return variants.map((variant) => ({
+      _id: variant._id,
+      _creationTime: variant._creationTime,
+      productId: variant.productId,
+      variantId: variant.variantId,
+      quantity: variant.quantity,
+      reserved: variant.reserved,
+      available: variant.quantity - variant.reserved,
     }));
   },
 });
@@ -65,12 +75,12 @@ export const updateStock = mutation({
     variantId: v.string(),
     quantity: v.number(),
   },
-  returns: v.id("stock"),
+  returns: v.id("variants"),
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
     
     const existing = await ctx.db
-      .query("stock")
+      .query("variants")
       .withIndex("by_product_variant", (q) =>
         q.eq("productId", args.productId).eq("variantId", args.variantId)
       )
@@ -80,12 +90,7 @@ export const updateStock = mutation({
       await ctx.db.patch(existing._id, { quantity: args.quantity });
       return existing._id;
     } else {
-      return await ctx.db.insert("stock", {
-        productId: args.productId,
-        variantId: args.variantId,
-        quantity: args.quantity,
-        reserved: 0,
-      });
+      throw new Error("Variant not found");
     }
   },
 });
@@ -101,18 +106,18 @@ export const reserveStock = mutation({
     v.null()
   ),
   handler: async (ctx, args) => {
-    const stock = await ctx.db
-      .query("stock")
+    const variant = await ctx.db
+      .query("variants")
       .withIndex("by_product_variant", (q) =>
         q.eq("productId", args.productId).eq("variantId", args.variantId)
       )
       .first();
 
-    if (!stock) {
-      return { success: false, message: "Stock not found" };
+    if (!variant) {
+      return { success: false, message: "Variant not found" };
     }
 
-    const available = stock.quantity - stock.reserved;
+    const available = variant.quantity - variant.reserved;
     if (available < args.quantity) {
       return {
         success: false,
@@ -120,8 +125,8 @@ export const reserveStock = mutation({
       };
     }
 
-    await ctx.db.patch(stock._id, {
-      reserved: stock.reserved + args.quantity,
+    await ctx.db.patch(variant._id, {
+      reserved: variant.reserved + args.quantity,
     });
 
     return { success: true, message: "Stock reserved" };
@@ -136,17 +141,17 @@ export const releaseStock = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const stock = await ctx.db
-      .query("stock")
+    const variant = await ctx.db
+      .query("variants")
       .withIndex("by_product_variant", (q) =>
         q.eq("productId", args.productId).eq("variantId", args.variantId)
       )
       .first();
 
-    if (!stock) return null;
+    if (!variant) return null;
 
-    await ctx.db.patch(stock._id, {
-      reserved: Math.max(0, stock.reserved - args.quantity),
+    await ctx.db.patch(variant._id, {
+      reserved: Math.max(0, variant.reserved - args.quantity),
     });
 
     return null;
@@ -161,18 +166,18 @@ export const confirmPurchase = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const stock = await ctx.db
-      .query("stock")
+    const variant = await ctx.db
+      .query("variants")
       .withIndex("by_product_variant", (q) =>
         q.eq("productId", args.productId).eq("variantId", args.variantId)
       )
       .first();
 
-    if (!stock) return null;
+    if (!variant) return null;
 
-    await ctx.db.patch(stock._id, {
-      quantity: stock.quantity - args.quantity,
-      reserved: Math.max(0, stock.reserved - args.quantity),
+    await ctx.db.patch(variant._id, {
+      quantity: variant.quantity - args.quantity,
+      reserved: Math.max(0, variant.reserved - args.quantity),
     });
 
     return null;

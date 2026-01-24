@@ -49,20 +49,12 @@ export default defineSchema({
         placeholder: v.optional(v.string()),
       })
     )),
-    quantity: v.optional(v.number()),
-    reserved: v.optional(v.number()), // Items in carts but not yet purchased
+    quantity: v.number(),
+    reserved: v.number(), // Items in carts but not yet purchased
   })
     .index("by_product_id", ["productId"])
     .index("by_product_variant", ["productId", "variantId"]),
 
-  stock: defineTable({
-    productId: v.id("products"),
-    variantId: v.string(),
-    quantity: v.number(),
-    reserved: v.number(), // Items in carts but not yet purchased
-  })
-    .index("by_product_variant", ["productId", "variantId"])
-    .index("by_product", ["productId"]),
 
   orders: defineTable({
     orderId: v.string(),

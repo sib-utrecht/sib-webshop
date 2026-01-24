@@ -17,11 +17,6 @@ export function ProductPage() {
     productId ? { productId } : "skip"
   );
   
-  const stockData = useQuery(
-    api.stock.getAllStock,
-    product ? { productId: product._id } : "skip"
-  );
-  
   const { addItem, items } = useCart();
   const [justAdded, setJustAdded] = useState(false);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
@@ -49,10 +44,6 @@ export function ProductPage() {
   const selectedVariant = product?.variants.find(
     (v) => v.variantId === selectedVariantId
   );
-  
-  const selectedStock = stockData?.find(
-    (s) => s.variantId === selectedVariantId
-  );
 
   const amountInCart = items.reduce((total, item) => {
     if (
@@ -69,7 +60,7 @@ export function ProductPage() {
     if (!product || !selectedVariant) return false;
     
     // Check stock availability
-    if (selectedStock && selectedStock.available <= 0) return false;
+    if (selectedVariant.available <= 0) return false;
     
     // Check required agreements
     if (selectedVariant.requiredAgreements && selectedVariant.requiredAgreements.length > 0 && !agreedToTerms) {
@@ -226,9 +217,8 @@ export function ProductPage() {
               </Label>
               <div className="mt-2 flex flex-wrap gap-2">
                 {product.variants.map((variant) => {
-                  const variantStock = stockData?.find((s) => s.variantId === variant.variantId);
-                  const isOutOfStock = variantStock && variantStock.available <= 0;
-                  const isLowStock = variantStock && variantStock.available > 0 && variantStock.available <= 5 && variantStock.available < 999999;
+                  const isOutOfStock = variant.available <= 0;
+                  const isLowStock = variant.available > 0 && variant.available <= 5 && variant.available < 999999;
                   
                   return (
                     <Button
@@ -245,7 +235,7 @@ export function ProductPage() {
                       )}
                       {isLowStock && !isOutOfStock && (
                         <span className="text-xs text-orange-600 mt-1">
-                          Only {variantStock.available} left
+                          Only {variant.available} left
                         </span>
                       )}
                     </Button>
@@ -262,12 +252,12 @@ export function ProductPage() {
                     Max {selectedVariant.maxQuantity} per order
                   </p>
                 )}
-                {selectedStock && selectedStock.available > 0 && selectedStock.available < 999999 && (
+                {selectedVariant.available > 0 && selectedVariant.available < 999999 && (
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {selectedStock.available} in stock
+                    {selectedVariant.available} in stock
                   </p>
                 )}
-                {selectedStock && selectedStock.available <= 0 && (
+                {selectedVariant.available <= 0 && (
                   <p className="mt-1 text-sm text-destructive font-semibold">
                     Out of stock
                   </p>
@@ -355,7 +345,7 @@ export function ProductPage() {
               </p>
             )}
             
-            {!canAddToCart() && selectedStock && selectedStock.available <= 0 && (
+            {!canAddToCart() && selectedVariant && selectedVariant.available <= 0 && (
               <p className="text-sm text-destructive">
                 This item is currently out of stock
               </p>

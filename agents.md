@@ -125,26 +125,23 @@ products: defineTable({
   imageUrl: v.string(),
   gallery: v.array(v.string()),    // Additional images
   isVirtual: v.boolean(),          // Virtual product (no shipping)
-  variants: v.array(v.object({
-    variantId: v.string(),
-    name: v.string(),
-    price: v.number(),
-    maxQuantity: v.optional(v.number()),
-    requiredAgreements: v.optional(v.array(v.string())),
-  })),
 }).index("by_product_id", ["productId"])
 ```
 
-### Stock Table
+### Variants Table
 ```typescript
-stock: defineTable({
+variants: defineTable({
   productId: v.id("products"),
   variantId: v.string(),
-  quantity: v.number(),            // Total available
+  name: v.string(),
+  price: v.number(),
+  maxQuantity: v.optional(v.number()),
+  requiredAgreements: v.optional(v.array(v.string())),
+  quantity: v.number(),            // Total available stock
   reserved: v.number(),            // Reserved in carts (future use)
 })
+.index("by_product_id", ["productId"])
 .index("by_product_variant", ["productId", "variantId"])
-.index("by_product", ["productId"])
 ```
 
 ## Key Intents & User Flows
@@ -203,17 +200,17 @@ stock: defineTable({
 
 | Query | Arguments | Returns | Description |
 |-------|-----------|---------|-------------|
-| `products.list` | none | `Product[]` | Get all products |
-| `products.getById` | `{ id }` | `Product \| null` | Get product by database ID |
-| `products.getByProductId` | `{ productId }` | `Product \| null` | Get product by human-readable ID |
-| `stock.getStock` | `{ productId, variantId }` | `Stock \| null` | Get stock for specific variant |
-| `stock.getAllStock` | `{ productId }` | `Stock[]` | Get all stock for a product |
+| `products.list` | none | `Product[]` | Get all products with variants (including stock) |
+| `products.getById` | `{ id }` | `Product \| null` | Get product by database ID with variants |
+| `products.getByProductId` | `{ productId }` | `Product \| null` | Get product by human-readable ID with variants |
+| `stock.getStock` | `{ productId, variantId }` | `Variant \| null` | Get stock info for specific variant |
+| `stock.getAllStock` | `{ productId }` | `Variant[]` | Get all stock info for a product's variants |
 
 ### Mutations
 
 | Mutation | Arguments | Returns | Description |
 |----------|-----------|---------|-------------|
-| `stock.updateStock` | `{ productId, variantId, quantity }` | `Id<"stock">` | Update stock quantity |
+| `stock.updateStock` | `{ productId, variantId, quantity }` | `Id<"variants">` | Update stock quantity for a variant |
 | `stock.reserveStock` | `{ productId, variantId, quantity }` | `{ success, message }` | Reserve stock (for cart) |
 | `stock.releaseStock` | `{ productId, variantId, quantity }` | `null` | Release reserved stock |
 | `checkout.processCheckout` | `{ items[] }` | `{ success, message, orderId }` | Process order and decrement stock |

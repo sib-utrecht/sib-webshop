@@ -42,21 +42,21 @@ export const createOrder = internalMutation({
 
     // Validate stock availability for all items
     for (const item of args.items) {
-      const stock = await ctx.db
-        .query("stock")
+      const variant = await ctx.db
+        .query("variants")
         .withIndex("by_product_variant", (q) =>
           q.eq("productId", item.productId).eq("variantId", item.variantId)
         )
         .first();
 
-      if (!stock) {
+      if (!variant) {
         return {
           success: false,
-          message: `Stock record not found for item`,
+          message: `Variant not found for item`,
         };
       }
 
-      const available = stock.quantity - stock.reserved;
+      const available = variant.quantity - variant.reserved;
       if (available < item.quantity) {
         const product = await ctx.db.get(item.productId);
         return {
@@ -253,16 +253,16 @@ export const updateOrderStatus = internalMutation({
     // If payment is successful, decrement stock
     if (args.status === "paid") {
       for (const item of order.items) {
-        const stock = await ctx.db
-          .query("stock")
+        const variant = await ctx.db
+          .query("variants")
           .withIndex("by_product_variant", (q) =>
             q.eq("productId", item.productId).eq("variantId", item.variantId)
           )
           .first();
 
-        if (stock) {
-          await ctx.db.patch(stock._id, {
-            quantity: stock.quantity - item.quantity,
+        if (variant) {
+          await ctx.db.patch(variant._id, {
+            quantity: variant.quantity - item.quantity,
           });
         }
       }

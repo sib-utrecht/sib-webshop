@@ -239,11 +239,6 @@ export function ProductEditorPage() {
   };
 
   const handleEdit = (product: typeof products[0]) => {
-    // Map stock data to variants
-    const stockMap = new Map(
-      product.stock?.map((s) => [s.variantId, s.quantity]) || []
-    );
-    
     setEditingProduct({
       _id: product._id,
       productId: product.productId,
@@ -254,8 +249,13 @@ export function ProductEditorPage() {
       gallery: product.gallery,
       isVirtual: product.isVirtual,
       variants: product.variants.map((v) => ({
-        ...v,
-        stock: stockMap.get(v.variantId) ?? 0,
+        variantId: v.variantId,
+        name: v.name,
+        price: v.price,
+        maxQuantity: v.maxQuantity,
+        requiredAgreements: v.requiredAgreements,
+        customFields: v.customFields,
+        stock: v.quantity,
       })),
     });
     setError("");

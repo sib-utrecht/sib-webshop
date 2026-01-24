@@ -20,6 +20,9 @@ const variantValidator = v.object({
       placeholder: v.optional(v.string()),
     })
   )),
+  quantity: v.number(),
+  reserved: v.number(),
+  available: v.number(),
 });
 
 const productValidator = v.object({
@@ -54,6 +57,9 @@ async function loadProductVariants(ctx: QueryCtx, productId: Id<"products">) {
     maxQuantity: v.maxQuantity,
     requiredAgreements: v.requiredAgreements,
     customFields: v.customFields,
+    quantity: v.quantity,
+    reserved: v.reserved,
+    available: v.quantity - v.reserved,
   }));
 }
 
@@ -70,17 +76,6 @@ const productWithStockValidator = v.object({
   isVisible: v.optional(v.boolean()),
   sortOrder: v.optional(v.number()),
   variants: v.array(variantValidator),
-  stock: v.optional(
-    v.array(
-      v.object({
-        _id: v.id("stock"),
-        variantId: v.string(),
-        quantity: v.number(),
-        reserved: v.number(),
-        available: v.number(),
-      })
-    )
-  ),
 });
 
 export const list = query({
@@ -99,26 +94,14 @@ export const list = query({
       return orderA - orderB;
     });
 
-    // Fetch variants and stock for all products
+    // Fetch variants (with stock) for all products
     const productsWithStock = await Promise.all(
       visibleProducts.map(async (product) => {
         const variants = await loadProductVariants(ctx, product._id);
-        
-        const stocks = await ctx.db
-          .query("stock")
-          .withIndex("by_product", (q) => q.eq("productId", product._id))
-          .collect();
 
         return {
           ...product,
           variants,
-          stock: stocks.map((stock) => ({
-            _id: stock._id,
-            variantId: stock.variantId,
-            quantity: stock.quantity,
-            reserved: stock.reserved,
-            available: stock.quantity - stock.reserved,
-          })),
         };
       })
     );
@@ -230,12 +213,6 @@ export const create = mutation({
         maxQuantity: variant.maxQuantity,
         requiredAgreements: variant.requiredAgreements,
         customFields: variant.customFields,
-      });
-
-      // Initialize stock for each variant
-      await ctx.db.insert("stock", {
-        productId: productDbId,
-        variantId: variant.variantId,
         quantity: 0,
         reserved: 0,
       });
@@ -308,23 +285,15 @@ export const update = mutation({
       isVisible: args.isVisible,
     });
 
-    // Get existing variants and stock entries
+    // Get existing variants
     const existingVariants = await ctx.db
       .query("variants")
       .withIndex("by_product_id", (q) => q.eq("productId", args.id))
       .collect();
-    
-    const existingStocks = await ctx.db
-      .query("stock")
-      .withIndex("by_product", (q) => q.eq("productId", args.id))
-      .collect();
 
-    // Create maps of existing data by variantId
+    // Create map of existing data by variantId
     const variantMap = new Map(
       existingVariants.map((v) => [v.variantId, v])
-    );
-    const stockMap = new Map(
-      existingStocks.map((stock) => [stock.variantId, stock])
     );
 
     // Track which variants are being kept
@@ -336,7 +305,7 @@ export const update = mutation({
       
       const existingVariant = variantMap.get(variant.variantId);
       if (existingVariant) {
-        // Update existing variant
+        // Update existing variant (preserve stock values)
         await ctx.db.patch(existingVariant._id, {
           name: variant.name,
           price: variant.price,
@@ -345,7 +314,7 @@ export const update = mutation({
           customFields: variant.customFields,
         });
       } else {
-        // Insert new variant
+        // Insert new variant with initial stock
         await ctx.db.insert("variants", {
           productId: args.id,
           variantId: variant.variantId,
@@ -354,32 +323,16 @@ export const update = mutation({
           maxQuantity: variant.maxQuantity,
           requiredAgreements: variant.requiredAgreements,
           customFields: variant.customFields,
-        });
-      }
-
-      // Handle stock
-      const existingStock = stockMap.get(variant.variantId);
-      if (!existingStock) {
-        // New variant, create stock entry
-        await ctx.db.insert("stock", {
-          productId: args.id,
-          variantId: variant.variantId,
           quantity: 0,
           reserved: 0,
         });
       }
     }
 
-    // Remove variants and stock entries that are no longer in the product
+    // Remove variants that are no longer in the product
     for (const variant of existingVariants) {
       if (!keptVariantIds.has(variant.variantId)) {
         await ctx.db.delete(variant._id);
-      }
-    }
-    
-    for (const stock of existingStocks) {
-      if (!keptVariantIds.has(stock.variantId)) {
-        await ctx.db.delete(stock._id);
       }
     }
 
@@ -408,16 +361,6 @@ export const remove = mutation({
       await ctx.db.delete(variant._id);
     }
 
-    // Delete all stock entries for this product
-    const stocks = await ctx.db
-      .query("stock")
-      .withIndex("by_product", (q) => q.eq("productId", args.id))
-      .collect();
-
-    for (const stock of stocks) {
-      await ctx.db.delete(stock._id);
-    }
-
     // Delete the product
     await ctx.db.delete(args.id);
 
@@ -443,26 +386,14 @@ export const listAll = query({
       return orderA - orderB;
     });
 
-    // Fetch variants and stock for all products
+    // Fetch variants (with stock) for all products
     const productsWithStock = await Promise.all(
       products.map(async (product) => {
         const variants = await loadProductVariants(ctx, product._id);
-        
-        const stocks = await ctx.db
-          .query("stock")
-          .withIndex("by_product", (q) => q.eq("productId", product._id))
-          .collect();
 
         return {
           ...product,
           variants,
-          stock: stocks.map((stock) => ({
-            _id: stock._id,
-            variantId: stock.variantId,
-            quantity: stock.quantity,
-            reserved: stock.reserved,
-            available: stock.quantity - stock.reserved,
-          })),
         };
       })
     );
