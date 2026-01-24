@@ -363,9 +363,14 @@ export const update = mutation({
         const currentVariantDbId = variantIdToDbId.get(variant.variantId);
         
         if (secondaryStockDbId && currentVariantDbId) {
+          const factor = variant.secondaryStockFactor ?? 1;
+          if (!Number.isInteger(factor) || factor < 1) {
+            throw new Error("secondaryStockFactor must be a positive integer (>= 1) when provided");
+          }
+
           await ctx.db.patch(currentVariantDbId, {
             secondaryStock: secondaryStockDbId,
-            secondaryStockFactor: variant.secondaryStockFactor ?? 1,
+            secondaryStockFactor: factor,
           });
         }
       } else {

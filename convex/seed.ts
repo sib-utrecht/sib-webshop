@@ -265,6 +265,7 @@ export const seed = internalMutation({
           price: variant.price,
           maxQuantity: "maxQuantity" in variant ? variant.maxQuantity : undefined,
           requiredAgreements: "requiredAgreements" in variant ? variant.requiredAgreements : undefined,
+          customFields: "customFields" in variant ? variant.customFields : undefined,
           quantity,
           reserved: 0,
         });
