@@ -49,6 +49,8 @@ export default defineSchema({
         placeholder: v.optional(v.string()),
       })
     )),
+    quantity: v.optional(v.number()),
+    reserved: v.optional(v.number()), // Items in carts but not yet purchased
   })
     .index("by_product_id", ["productId"])
     .index("by_product_variant", ["productId", "variantId"]),

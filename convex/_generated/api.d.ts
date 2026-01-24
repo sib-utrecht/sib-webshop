@@ -11,6 +11,7 @@
 import type * as auth from "../auth.js";
 import type * as checkout from "../checkout.js";
 import type * as http from "../http.js";
+import type * as migrateStock from "../migrateStock.js";
 import type * as migrateVariants from "../migrateVariants.js";
 import type * as orders from "../orders.js";
 import type * as payment from "../payment.js";
@@ -29,6 +30,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   checkout: typeof checkout;
   http: typeof http;
+  migrateStock: typeof migrateStock;
   migrateVariants: typeof migrateVariants;
   orders: typeof orders;
   payment: typeof payment;
