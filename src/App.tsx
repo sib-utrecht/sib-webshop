@@ -12,6 +12,7 @@ import { LoginPage } from "@/pages/LoginPage";
 import { DebugPage } from "@/pages/DebugPage";
 import { ViewsListPage } from "@/pages/ViewsListPage";
 import { ViewDetailPage } from "@/pages/ViewDetailPage";
+import { SharedViewPage } from "@/pages/SharedViewPage";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
           <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/debug" element={<DebugPage />} />
+          <Route path="/shared/:shareToken" element={<SharedViewPage />} />
           <Route
             path="/orders"
             element={

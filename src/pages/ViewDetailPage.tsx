@@ -4,7 +4,7 @@ import { api } from "../../convex/_generated/api";
 import { useParams, useNavigate } from "react-router-dom";
 import type { Id } from "../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download, GripVertical, ArrowUp, ArrowDown, Filter, Pencil, Check, X } from "lucide-react";
+import { ArrowLeft, Download, GripVertical, ArrowUp, ArrowDown, Filter, Pencil, Check, X, Share2, Copy, Link2Off } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -92,6 +92,8 @@ export function ViewDetailPage() {
   const view = useQuery(api.views.get, { viewId: viewId as Id<"views"> });
   const products = useQuery(api.products.listAll);
   const updateView = useMutation(api.views.update);
+  const generateShareToken = useMutation(api.views.generateShareToken);
+  const disableSharing = useMutation(api.views.disableSharing);
   
   // Local state for editing
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -104,6 +106,7 @@ export function ViewDetailPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+  const [copiedToClipboard, setCopiedToClipboard] = useState(false);
 
   // Load view data into local state
   useEffect(() => {
@@ -318,6 +321,25 @@ export function ViewDetailPage() {
     });
   };
 
+  // Share link handlers
+  const handleGenerateShareLink = async () => {
+    if (!viewId) return;
+    await generateShareToken({ viewId: viewId as Id<"views"> });
+  };
+
+  const handleDisableSharing = async () => {
+    if (!viewId) return;
+    await disableSharing({ viewId: viewId as Id<"views"> });
+  };
+
+  const handleCopyShareLink = () => {
+    if (!view?.shareToken) return;
+    const shareUrl = `${window.location.origin}/shared/${view.shareToken}`;
+    navigator.clipboard.writeText(shareUrl);
+    setCopiedToClipboard(true);
+    setTimeout(() => setCopiedToClipboard(false), 2000);
+  };
+
   if (view === undefined) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -503,6 +525,87 @@ export function ViewDetailPage() {
             </Button>
           </div>
         </div>
+
+      {/* Share Link Section */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Share2 className="h-5 w-5" />
+            Share View
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {view.shareToken ? (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="shareUrl" className="text-sm font-medium">
+                  Share URL
+                </Label>
+                <div className="flex gap-2 mt-2">
+                  <Input
+                    id="shareUrl"
+                    value={`${window.location.origin}/shared/${view.shareToken}`}
+                    readOnly
+                    className="font-mono text-sm"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopyShareLink}
+                  >
+                    {copiedToClipboard ? (
+                      <>
+                        <Check className="h-4 w-4 mr-2" />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Anyone with this link can view this data in read-only mode.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGenerateShareLink}
+                >
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Regenerate Link
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDisableSharing}
+                >
+                  <Link2Off className="h-4 w-4 mr-2" />
+                  Disable Sharing
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Sharing is currently disabled. Generate a secure link to share this view with others.
+              </p>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleGenerateShareLink}
+              >
+                <Share2 className="h-4 w-4 mr-2" />
+                Generate Share Link
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Column Badges */}
       <div className="mb-4 p-4 border rounded-lg bg-muted/20">
