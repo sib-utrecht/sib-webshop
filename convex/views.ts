@@ -199,59 +199,23 @@ export const execute = query({
     // Apply sorting
     if (view.sortBy) {
       const sortOrder = view.sortOrder || "asc";
-      filteredRows.sort((a, b) => {
-        let aValue: string | number;
-        let bValue: string | number;
-        
-        // Get values based on sort column
-        switch (view.sortBy) {
-          case "orderId":
-            aValue = a.orderId;
-            bValue = b.orderId;
-            break;
-          case "orderCreationTime":
-            aValue = a.orderCreationTime;
-            bValue = b.orderCreationTime;
-            break;
-          case "email":
-            aValue = a.email;
-            bValue = b.email;
-            break;
-          case "name":
-            aValue = a.name;
-            bValue = b.name;
-            break;
-          case "productName":
-            aValue = a.productName;
-            bValue = b.productName;
-            break;
-          case "variantName":
-            aValue = a.variantName;
-            bValue = b.variantName;
-            break;
-          case "quantity":
-            aValue = a.quantity;
-            bValue = b.quantity;
-            break;
-          case "price":
-            aValue = a.price;
-            bValue = b.price;
-            break;
-          case "itemTotal":
-            aValue = a.itemTotal;
-            bValue = b.itemTotal;
-            break;
-          default:
-            // Check if it's a custom field
-            if (view.sortBy.startsWith("customField_")) {
-              const fieldId = view.sortBy.substring("customField_".length);
-              aValue = a.customFieldResponses?.[fieldId] || "";
-              bValue = b.customFieldResponses?.[fieldId] || "";
-            } else {
-              aValue = "";
-              bValue = "";
-            }
+      
+      // Helper function to get field value by name
+      const getFieldValue = (row: typeof filteredRows[0], fieldName: string): string | number => {
+        // Check if it's a custom field
+        if (fieldName.startsWith("customField_")) {
+          const fieldId = fieldName.substring("customField_".length);
+          return row.customFieldResponses?.[fieldId] || "";
         }
+        
+        // Access the field directly by name
+        const value = row[fieldName as keyof typeof row];
+        return value !== undefined && value !== null ? value : "";
+      };
+      
+      filteredRows.sort((a, b) => {
+        const aValue = getFieldValue(a, view.sortBy!);
+        const bValue = getFieldValue(b, view.sortBy!);
         
         // Compare values
         if (typeof aValue === "number" && typeof bValue === "number") {
