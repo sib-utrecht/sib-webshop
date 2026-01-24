@@ -268,9 +268,9 @@ export const releaseExpiredReservations = internalMutation({
           )
           .first();
 
-        if (variant && variant.reserved >= item.quantity) {
+        if (variant) {
           await ctx.db.patch(variant._id, {
-            reserved: variant.reserved - item.quantity,
+            reserved: Math.max(0, variant.reserved - item.quantity),
           });
 
           // Also release secondary stock if it exists
