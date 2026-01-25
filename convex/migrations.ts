@@ -176,3 +176,53 @@ export const removeFieldIdFromAllTables = internalMutation({
     };
   },
 });
+
+/**
+ * Migration: Remove legacy variants field from products table
+ * 
+ * This migration removes the deprecated `variants` field from the products table.
+ * This field was used before the variants table was created. All variant data
+ * should now be stored in the separate variants table.
+ * 
+ * WARNING: Only run this after confirming that all products have their variants
+ * properly migrated to the variants table.
+ */
+export const removeLegacyVariantsField = internalMutation({
+  args: {},
+  returns: v.object({
+    productsUpdated: v.number(),
+    success: v.boolean(),
+    message: v.string(),
+  }),
+  handler: async (ctx) => {
+    let productsUpdated = 0;
+
+    const products = await ctx.db.query("products").collect();
+
+    for (const product of products) {
+      // Check if product has the legacy variants field
+      if ('variants' in product && product.variants !== undefined) {
+        // Remove the variants field by replacing with undefined
+        await ctx.db.replace(product._id, {
+          productId: product.productId,
+          name: product.name,
+          description: product.description,
+          shortDescription: product.shortDescription,
+          imageUrl: product.imageUrl,
+          gallery: product.gallery,
+          isVirtual: product.isVirtual,
+          isVisible: product.isVisible,
+          sortOrder: product.sortOrder,
+          // Note: variants field is intentionally omitted
+        });
+        productsUpdated++;
+      }
+    }
+
+    return {
+      productsUpdated,
+      success: true,
+      message: `Migration completed successfully. Removed legacy variants field from ${productsUpdated} products.`,
+    };
+  },
+});
