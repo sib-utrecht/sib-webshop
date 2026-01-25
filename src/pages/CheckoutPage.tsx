@@ -14,13 +14,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useCart } from "@/context/CartContext";
-import ReactMarkdown from "react-markdown";
 import { useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { CustomFieldsEditor } from "@/components/product/CustomFieldsEditor";
 
 export function CheckoutPage() {
-  const { items, totalPrice, removeItem, updateQuantity, updateAgreement, updateCustomFieldResponse } = useCart();
+  const { items, totalPrice, removeItem, updateQuantity, updateCustomFieldResponse } = useCart();
   const processCheckout = useAction(api.checkout.processCheckout);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -53,7 +52,9 @@ export function CheckoutPage() {
   const itemsWithCustomFields = items.filter(
     (item) => item.customFields && item.customFields.length > 0
   );
-  const allAgreed = itemsWithAgreements.every((item) => item.agreedToTerms);
+  const allAgreed = itemsWithAgreements.every((item) => 
+    item.agreements && item.agreements.length > 0
+  );
   const allCustomFieldsFilled = itemsWithCustomFields.every((item) => {
     if (!item.customFields) return true;
     return item.customFields.every((field) => {
@@ -223,33 +224,22 @@ export function CheckoutPage() {
                       </div>
                     </div>
 
-                    {/* Required Agreements - Inline */}
+                    {/* Required Agreements - Display Only */}
                     {hasAgreements && (
                       <div className="mt-3 ml-20 p-3 border rounded-lg bg-muted/50 space-y-2">
-                        <p className="text-xs font-semibold">Required Agreements</p>
-                        {item.requiredAgreements?.map((agreement, index) => (
-                          <div key={index} className="flex items-start gap-2">
-                            <input
-                              type="checkbox"
-                              id={`checkout-agreement-${item.cartItemId}-${index}`}
-                              checked={item.agreedToTerms || false}
-                              onChange={(e) => updateAgreement(item.cartItemId, e.target.checked)}
-                              className="mt-1 cursor-pointer"
-                            />
-                            <Label
-                              htmlFor={`checkout-agreement-${item.cartItemId}-${index}`}
-                              className="text-xs cursor-pointer"
-                            >
-                              <span className="inline">
-                                <ReactMarkdown>{agreement}</ReactMarkdown>
-                              </span>
-                            </Label>
+                        <p className="text-xs font-semibold">Agreements</p>
+                        {item.agreements && item.agreements.length > 0 ? (
+                          <div className="space-y-1">
+                            {item.agreements.map((agreement, index) => (
+                              <p key={index} className="text-xs text-muted-foreground whitespace-pre-wrap">
+                                ✓ {agreement}
+                              </p>
+                            ))}
                           </div>
-                        ))}
-                        {!item.agreedToTerms && (
+                        ) : (
                           <div className="flex items-start gap-2 text-destructive">
                             <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
-                            <p className="text-xs">Please agree to continue</p>
+                            <p className="text-xs">Agreement missing - please remove and re-add this item</p>
                           </div>
                         )}
                       </div>

@@ -2,7 +2,6 @@ import { useParams, Link } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { useCart } from "@/context/CartContext";
 import { ArrowLeft, ShoppingCart, Check } from "lucide-react";
@@ -21,7 +20,7 @@ export function ProductPage() {
   const [justAdded, setJustAdded] = useState(false);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState<string[]>([]);
   const [customFieldResponses, setCustomFieldResponses] = useState<Record<string, string>>({});
   const [showFieldValidation, setShowFieldValidation] = useState(false);
 
@@ -38,7 +37,7 @@ export function ProductPage() {
     setSelectedVariantId(variantId);
     setCustomFieldResponses({});
     setShowFieldValidation(false);
-    setAgreedToTerms(false);
+    setAgreedToTerms([]);
   };
 
   const selectedVariant = product?.variants.find(
@@ -63,8 +62,13 @@ export function ProductPage() {
     if (selectedVariant.available <= 0) return false;
     
     // Check required agreements
-    if (selectedVariant.requiredAgreements && selectedVariant.requiredAgreements.length > 0 && !agreedToTerms) {
-      return false;
+    if (selectedVariant.requiredAgreements && selectedVariant.requiredAgreements.length > 0) {
+      if (agreedToTerms.length !== selectedVariant.requiredAgreements.length) {
+        return false;
+      }
+      if (agreedToTerms.some(agreement => !agreement)) {
+        return false;
+      }
     }
     
     // Check required custom fields
@@ -91,6 +95,11 @@ export function ProductPage() {
       setShowFieldValidation(true);
       return;
     }
+
+    // Create timestamped agreements if user agreed
+    const agreements = selectedVariant.requiredAgreements && agreedToTerms.length > 0
+      ? agreedToTerms
+      : undefined;
     
     addItem({
       productId: product._id,
@@ -102,13 +111,14 @@ export function ProductPage() {
       isVirtual: product.isVirtual,
       maxQuantity: selectedVariant.maxQuantity,
       requiredAgreements: selectedVariant.requiredAgreements,
+      agreements: agreements,
       customFields: selectedVariant.customFields,
       customFieldResponses: customFieldResponses,
     });
     
     // Reset fields after adding to cart
     setCustomFieldResponses({});
-    setAgreedToTerms(false);
+    setAgreedToTerms([]);
     setShowFieldValidation(false);
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 2000);
@@ -269,8 +279,19 @@ export function ProductPage() {
                   <input
                     type="checkbox"
                     id={`agreement-${index}`}
-                    checked={agreedToTerms}
-                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                    checked={!!agreedToTerms[index]}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+                        const newAgreements = [...agreedToTerms];
+                        newAgreements[index] = `At ${timestamp}: [x] ${agreement}`;
+                        setAgreedToTerms(newAgreements);
+                      } else {
+                        const newAgreements = [...agreedToTerms];
+                        newAgreements[index] = '';
+                        setAgreedToTerms(newAgreements);
+                      }
+                    }}
                     className="mt-1 cursor-pointer"
                   />
                   <Label htmlFor={`agreement-${index}`} className="text-sm cursor-pointer">
@@ -334,7 +355,7 @@ export function ProductPage() {
               )}
             </div>
 
-            {!canAddToCart() && selectedVariant?.requiredAgreements && !agreedToTerms && (
+            {!canAddToCart() && selectedVariant?.requiredAgreements && agreedToTerms.length !== selectedVariant.requiredAgreements.length && (
               <p className="text-sm text-destructive">
                 Please agree to the terms above to continue
               </p>

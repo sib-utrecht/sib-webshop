@@ -24,6 +24,7 @@ const createOrderReturnValidator = v.object({
       quantity: v.number(),
       price: v.number(),
       customFieldResponses: v.optional(v.record(v.string(), v.string())),
+      agreements: v.optional(v.array(v.string())),
     })
   )),
 });
@@ -36,6 +37,7 @@ export const createOrder = internalMutation({
         variantId: v.string(),
         quantity: v.number(),
         customFieldResponses: v.optional(v.record(v.string(), v.string())),
+        agreements: v.optional(v.array(v.string())),
       })
     ),
     email: v.string(),
@@ -161,6 +163,7 @@ export const createOrder = internalMutation({
         quantity: item.quantity,
         price: variant.price,
         customFieldResponses: item.customFieldResponses,
+        agreements: item.agreements,
       });
     }
 
@@ -201,6 +204,7 @@ export const processCheckout = action({
         variantId: v.string(),
         quantity: v.number(),
         customFieldResponses: v.optional(v.record(v.string(), v.string())),
+        agreements: v.optional(v.array(v.string())),
       })
     ),
     email: v.string(),

@@ -13,7 +13,7 @@ export interface CartItem {
   quantity: number;
   maxQuantity?: number;
   requiredAgreements?: string[];
-  agreedToTerms?: boolean;
+  agreements?: string[]; // Timestamped agreement strings
   customFields?: Array<{
     fieldId: string;
     label: string;
@@ -26,10 +26,9 @@ export interface CartItem {
 
 interface CartContextType {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, "cartItemId" | "quantity" | "agreedToTerms">) => void;
+  addItem: (item: Omit<CartItem, "cartItemId" | "quantity">) => void;
   removeItem: (cartItemId: string) => void;
   updateQuantity: (cartItemId: string, quantity: number) => void;
-  updateAgreement: (cartItemId: string, agreed: boolean) => void;
   updateCustomFieldResponse: (cartItemId: string, fieldId: string, value: string) => void;
   clearCart: () => void;
   totalItems: number;
@@ -91,7 +90,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
   }, [items]);
 
-  const addItem = (item: Omit<CartItem, "cartItemId" | "quantity" | "agreedToTerms">) => {
+  const addItem = (item: Omit<CartItem, "cartItemId" | "quantity">) => {
     setItems((prev) => {
       // Items with custom fields should not stack - each one may have different responses
       if (item.customFields && item.customFields.length > 0) {
@@ -101,7 +100,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
             ...item,
             cartItemId: `${item.productId}-${item.variantId}-${Date.now()}-${Math.random()}`,
             quantity: 1,
-            agreedToTerms: item.requiredAgreements ? false : undefined,
           },
         ];
       }
@@ -127,7 +125,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
           ...item,
           cartItemId: `${item.productId}-${item.variantId}`,
           quantity: 1,
-          agreedToTerms: item.requiredAgreements ? false : undefined,
           customFieldResponses: item.customFields ? {} : undefined,
         },
       ];
@@ -153,12 +150,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }
         return i;
       })
-    );
-  };
-
-  const updateAgreement = (cartItemId: string, agreed: boolean) => {
-    setItems((prev) =>
-      prev.map((i) => (i.cartItemId === cartItemId ? { ...i, agreedToTerms: agreed } : i))
     );
   };
 
@@ -189,7 +180,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         addItem,
         removeItem,
         updateQuantity,
-        updateAgreement,
         updateCustomFieldResponse,
         clearCart,
         totalItems,

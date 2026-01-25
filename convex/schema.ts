@@ -72,6 +72,7 @@ export default defineSchema({
         quantity: v.number(),
         price: v.number(),
         customFieldResponses: v.optional(v.record(v.string(), v.string())),
+        agreements: v.optional(v.array(v.string())),
       })
     ),
     totalAmount: v.number(),
