@@ -806,7 +806,11 @@ export function ProductEditorPage() {
                       >
                         <option value="">None - independent stock</option>
                         {editingProduct.variants
-                          .filter((v) => v.variantId !== variant.variantId)
+                          .filter((v) => 
+                            // Prevent self-reference and circular reference (A→B blocks B→A)
+                            v.variantId !== variant.variantId && 
+                            v.secondaryStockVariantId !== variant.variantId
+                          )
                           .map((v) => (
                             <option key={v.variantId} value={v.variantId}>
                               {v.name} ({v.variantId})
@@ -815,6 +819,14 @@ export function ProductEditorPage() {
                       </select>
                       <p className="text-xs text-muted-foreground mt-1">
                         Share stock with another variant. Available stock will be the minimum of both.
+                        {editingProduct.variants.some((v) => 
+                          v.variantId !== variant.variantId && 
+                          v.secondaryStockVariantId === variant.variantId
+                        ) && (
+                          <span className="block mt-1 text-amber-600">
+                            Note: Some variants are hidden to prevent circular references.
+                          </span>
+                        )}
                       </p>
                     </div>
 
