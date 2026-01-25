@@ -12,25 +12,6 @@ export default defineSchema({
     isVirtual: v.boolean(),
     isVisible: v.optional(v.boolean()),
     sortOrder: v.optional(v.number()),
-    // Legacy field - kept optional for migration, can be removed after migration
-    variants: v.optional(v.array(
-      v.object({
-        variantId: v.string(),
-        name: v.string(),
-        price: v.number(),
-        maxQuantity: v.optional(v.number()),
-        requiredAgreements: v.optional(v.array(v.string())),
-        customFields: v.optional(v.array(
-          v.object({
-            fieldId: v.optional(v.string()),
-            label: v.string(),
-            type: v.union(v.literal("text"), v.literal("email"), v.literal("tel"), v.literal("textarea")),
-            required: v.boolean(),
-            placeholder: v.optional(v.string()),
-          })
-        )),
-      })
-    )),
   }).index("by_product_id", ["productId"]),
 
   variants: defineTable({
@@ -42,7 +23,6 @@ export default defineSchema({
     requiredAgreements: v.optional(v.array(v.string())),
     customFields: v.optional(v.array(
       v.object({
-        fieldId: v.optional(v.string()),
         label: v.string(),
         type: v.union(v.literal("text"), v.literal("email"), v.literal("tel"), v.literal("textarea")),
         required: v.boolean(),
