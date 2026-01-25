@@ -108,8 +108,7 @@ export function StockOverviewPage() {
               <CardContent>
                 <div className="space-y-3">
                   {product.variants.map((variant) => {
-                    const stockInfo = product.stock?.find((s) => s.variantId === variant.variantId);
-                    const quantity = stockInfo?.quantity ?? 0;
+                    const quantity = variant.quantity;
                     const isEditing =
                       editingStock?.productId === product._id &&
                       editingStock?.variantId === variant.variantId;

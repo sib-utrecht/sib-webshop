@@ -49,6 +49,8 @@ type Variant = {
     placeholder?: string;
   }>;
   stock?: number;
+  secondaryStockVariantId?: string; // Reference to another variant by variantId
+  secondaryStockFactor?: number; // How many units of secondary stock to decrement (default 1)
 };
 
 type ProductForm = {
@@ -60,6 +62,7 @@ type ProductForm = {
   imageUrl: string;
   gallery: string[];
   isVirtual: boolean;
+  isVisible?: boolean;
   variants: Variant[];
 };
 
@@ -239,11 +242,11 @@ export function ProductEditorPage() {
   };
 
   const handleEdit = (product: typeof products[0]) => {
-    // Map stock data to variants
-    const stockMap = new Map(
-      product.stock?.map((s) => [s.variantId, s.quantity]) || []
+    // Create a map of variant DB IDs to variantIds for lookup
+    const variantDbIdToVariantId = new Map(
+      product.variants.map((v) => [v._id, v.variantId])
     );
-    
+
     setEditingProduct({
       _id: product._id,
       productId: product.productId,
@@ -253,9 +256,19 @@ export function ProductEditorPage() {
       imageUrl: product.imageUrl,
       gallery: product.gallery,
       isVirtual: product.isVirtual,
+      isVisible: product.isVisible,
       variants: product.variants.map((v) => ({
-        ...v,
-        stock: stockMap.get(v.variantId) ?? 0,
+        variantId: v.variantId,
+        name: v.name,
+        price: v.price,
+        maxQuantity: v.maxQuantity,
+        requiredAgreements: v.requiredAgreements,
+        customFields: v.customFields,
+        stock: v.quantity,
+        secondaryStockVariantId: v.secondaryStock
+          ? variantDbIdToVariantId.get(v.secondaryStock)
+          : undefined,
+        secondaryStockFactor: v.secondaryStockFactor,
       })),
     });
     setError("");
@@ -314,6 +327,7 @@ export function ProductEditorPage() {
           imageUrl: editingProduct.imageUrl,
           gallery: editingProduct.gallery,
           isVirtual: editingProduct.isVirtual,
+          isVisible: editingProduct.isVisible,
           variants: variantsWithoutStock,
         });
         productId = editingProduct._id;
@@ -326,6 +340,7 @@ export function ProductEditorPage() {
           imageUrl: editingProduct.imageUrl,
           gallery: editingProduct.gallery,
           isVirtual: editingProduct.isVirtual,
+          isVisible: editingProduct.isVisible,
           variants: variantsWithoutStock,
         });
       }
@@ -772,6 +787,73 @@ export function ProductEditorPage() {
                         />
                       </div>
                     </div>
+
+                    <div>
+                      <Label htmlFor={`variantSecondaryStock-${index}`}>
+                        Secondary Stock (optional)
+                      </Label>
+                      <select
+                        id={`variantSecondaryStock-${index}`}
+                        value={variant.secondaryStockVariantId || ""}
+                        onChange={(e) =>
+                          updateVariant(
+                            index,
+                            "secondaryStockVariantId",
+                            e.target.value || undefined
+                          )
+                        }
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 cursor-pointer"
+                      >
+                        <option value="">None - independent stock</option>
+                        {editingProduct.variants
+                          .filter((v) => 
+                            // Prevent self-reference and circular reference (A→B blocks B→A)
+                            v.variantId !== variant.variantId && 
+                            v.secondaryStockVariantId !== variant.variantId
+                          )
+                          .map((v) => (
+                            <option key={v.variantId} value={v.variantId}>
+                              {v.name} ({v.variantId})
+                            </option>
+                          ))}
+                      </select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Share stock with another variant. Available stock will be the minimum of both.
+                        {editingProduct.variants.some((v) => 
+                          v.variantId !== variant.variantId && 
+                          v.secondaryStockVariantId === variant.variantId
+                        ) && (
+                          <span className="block mt-1 text-amber-600">
+                            Note: Some variants are hidden to prevent circular references.
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    {variant.secondaryStockVariantId && (
+                      <div>
+                        <Label htmlFor={`variantSecondaryStockFactor-${index}`}>
+                          Secondary Stock Factor
+                        </Label>
+                        <Input
+                          id={`variantSecondaryStockFactor-${index}`}
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={variant.secondaryStockFactor ?? 1}
+                          onChange={(e) =>
+                            updateVariant(
+                              index,
+                              "secondaryStockFactor",
+                              parseInt(e.target.value) || 1
+                            )
+                          }
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          How many units of secondary stock to decrement per sale (e.g., 2 for combi tickets).
+                        </p>
+                      </div>
+                    )}
 
                     {/* Custom Fields Section */}
                     <div className="mt-4 space-y-3">

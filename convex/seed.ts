@@ -31,6 +31,14 @@ const mockProducts = [
         price: 9.5,
         maxQuantity: 1,
         requiredAgreements: [codeOfConductAgreementPlusOne],
+        customFields: [
+          {
+            fieldId: "name",
+            label: "Full name",
+            type: "text",
+            required: true,
+          } as const,
+        ],
       },
       {
         variantId: "plusone",
@@ -223,23 +231,29 @@ export const seed = internalMutation({
     for (const product of existingProducts) {
       await ctx.db.delete(product._id);
     }
-    
-    const existingStock = await ctx.db.query("stock").collect();
-    for (const stock of existingStock) {
-      await ctx.db.delete(stock._id);
+
+    const existingVariants = await ctx.db.query("variants").collect();
+    for (const variant of existingVariants) {
+      await ctx.db.delete(variant._id);
     }
 
     // Insert all mock products and initialize stock
     for (const product of mockProducts) {
       const productId: Id<"products"> = await ctx.db.insert("products", {
-        ...product,
+        productId: product.productId,
+        name: product.name,
+        description: product.description,
+        shortDescription: product.shortDescription,
+        imageUrl: product.imageUrl,
+        gallery: product.gallery,
+        isVirtual: product.isVirtual,
         isVisible: true,
       });
-      
-      // Initialize stock for each variant
+
+      // Initialize variants with stock for each variant
       for (const variant of product.variants) {
         let quantity: number;
-        
+
         // Set stock quantities based on product type
         if (product.isVirtual) {
           // Virtual products have unlimited stock
@@ -251,16 +265,21 @@ export const seed = internalMutation({
           // Physical merchandise
           quantity = 20;
         }
-        
-        await ctx.db.insert("stock", {
+
+        await ctx.db.insert("variants", {
           productId,
           variantId: variant.variantId,
+          name: variant.name,
+          price: variant.price,
+          maxQuantity: "maxQuantity" in variant ? variant.maxQuantity : undefined,
+          requiredAgreements: "requiredAgreements" in variant ? variant.requiredAgreements : undefined,
+          customFields: "customFields" in variant ? variant.customFields : undefined,
           quantity,
           reserved: 0,
         });
       }
     }
-    
+
     console.log(`Seeded ${mockProducts.length} products with stock`);
     return null;
   },

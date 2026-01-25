@@ -1,10 +1,22 @@
 import { mutation, internalMutation, action } from "./_generated/server";
-import { v } from "convex/values";
+import { Infer, v } from "convex/values";
 import { internal } from "./_generated/api";
+import { Doc } from "./_generated/dataModel";
+import { getAvailableStock } from "./stockHelpers";
 
 /**
  * Create an order (internal use - called by processCheckout action)
  */
+const createOrderReturnValidator = v.object({
+  success: v.boolean(),
+  message: v.string(),
+  orderId: v.optional(v.string()),
+  orderDbId: v.optional(v.id("orders")),
+  name: v.optional(v.string()),
+  email: v.optional(v.string()),
+  totalAmount: v.optional(v.number()),
+});
+
 export const createOrder = internalMutation({
   args: {
     items: v.array(
@@ -19,16 +31,8 @@ export const createOrder = internalMutation({
     name: v.string(),
     comments: v.optional(v.string()),
   },
-  returns: v.object({
-    success: v.boolean(),
-    message: v.string(),
-    orderId: v.optional(v.string()),
-    orderDbId: v.optional(v.id("orders")),
-    name: v.optional(v.string()),
-    email: v.optional(v.string()),
-    totalAmount: v.optional(v.number()),
-  }),
-  handler: async (ctx, args) => {
+  returns: createOrderReturnValidator,
+  handler: async (ctx, args): Promise<Infer<typeof createOrderReturnValidator>> => {
     // Validate quantities are positive integers
     for (const item of args.items) {
       const quantity = Math.floor(Math.abs(item.quantity));
@@ -42,21 +46,22 @@ export const createOrder = internalMutation({
 
     // Validate stock availability for all items
     for (const item of args.items) {
-      const stock = await ctx.db
-        .query("stock")
+      const variant = await ctx.db
+        .query("variants")
         .withIndex("by_product_variant", (q) =>
           q.eq("productId", item.productId).eq("variantId", item.variantId)
         )
         .first();
 
-      if (!stock) {
+      if (!variant) {
         return {
           success: false,
-          message: `Stock record not found for item`,
+          message: `Variant not found for item`,
         };
       }
 
-      const available = stock.quantity - stock.reserved;
+      const available = await getAvailableStock(variant, (id) => ctx.db.get(id));
+
       if (available < item.quantity) {
         const product = await ctx.db.get(item.productId);
         return {
@@ -64,6 +69,37 @@ export const createOrder = internalMutation({
           message: `Insufficient stock for ${product?.name || "item"}. Only ${available} available.`,
         };
       }
+    }
+
+    // Reserve stock for all items before creating the order
+    const reservedItems: Array<{ productId: Doc<"products">["_id"]; variantId: string; quantity: number }> = [];
+    for (const item of args.items) {
+      const reserveResult: { success: boolean; message: string } | null = await ctx.runMutation(internal.stock.reserveStock, {
+        productId: item.productId,
+        variantId: item.variantId,
+        quantity: item.quantity,
+      });
+
+      if (!reserveResult || !reserveResult.success) {
+        // Rollback: release all previously reserved stock
+        for (const reserved of reservedItems) {
+          await ctx.runMutation(internal.stock.releaseStock, {
+            productId: reserved.productId,
+            variantId: reserved.variantId,
+            quantity: reserved.quantity,
+          });
+        }
+        return {
+          success: false,
+          message: reserveResult?.message || "Failed to reserve stock",
+        };
+      }
+
+      reservedItems.push({
+        productId: item.productId,
+        variantId: item.variantId,
+        quantity: item.quantity,
+      });
     }
 
     // Generate order ID with year and month (e.g., SIB-2026-01-ABC123)
@@ -244,27 +280,39 @@ export const updateOrderStatus = internalMutation({
       return null;
     }
 
+    // Check if status has already been updated to prevent duplicate stock operations
+    // Note: This is safe from race conditions because Convex mutations run in transactions,
+    // ensuring that concurrent webhook calls will be serialized and only the first will pass this check.
+    const previousPaymentStatus = order.paymentStatus;
+    if (previousPaymentStatus === args.status) {
+      console.log(`Order ${args.orderId} already has payment status ${args.status}, skipping duplicate processing`);
+      return null;
+    }
+
     // Update payment status
     await ctx.db.patch(order._id, {
       paymentStatus: args.status as any,
       status: args.status === "paid" ? "paid" : order.status,
     });
 
-    // If payment is successful, decrement stock
+    // Handle stock based on payment status (only if status changed)
     if (args.status === "paid") {
+      // Payment successful: confirm purchase (decrement quantity and release reservation)
       for (const item of order.items) {
-        const stock = await ctx.db
-          .query("stock")
-          .withIndex("by_product_variant", (q) =>
-            q.eq("productId", item.productId).eq("variantId", item.variantId)
-          )
-          .first();
-
-        if (stock) {
-          await ctx.db.patch(stock._id, {
-            quantity: stock.quantity - item.quantity,
-          });
-        }
+        await ctx.runMutation(internal.stock.confirmPurchase, {
+          productId: item.productId,
+          variantId: item.variantId,
+          quantity: item.quantity,
+        });
+      }
+    } else if (args.status === "expired" || args.status === "failed" || args.status === "canceled") {
+      // Payment failed/expired/canceled: release reserved stock
+      for (const item of order.items) {
+        await ctx.runMutation(internal.stock.releaseStock, {
+          productId: item.productId,
+          variantId: item.variantId,
+          quantity: item.quantity,
+        });
       }
     }
 
