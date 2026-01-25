@@ -278,6 +278,8 @@ export const updateOrderStatus = internalMutation({
     }
 
     // Check if status has already been updated to prevent duplicate stock operations
+    // Note: This is safe from race conditions because Convex mutations run in transactions,
+    // ensuring that concurrent webhook calls will be serialized and only the first will pass this check.
     const previousPaymentStatus = order.paymentStatus;
     if (previousPaymentStatus === args.status) {
       console.log(`Order ${args.orderId} already has payment status ${args.status}, skipping duplicate processing`);
