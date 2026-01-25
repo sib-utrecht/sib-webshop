@@ -230,3 +230,89 @@ export const confirmPurchase = internalMutation({
     return null;
   },
 });
+
+/**
+ * Release stock reservations for expired orders
+ * Orders are considered expired if:
+ * - They are older than 30 minutes
+ * - Payment status is still "open" (not paid, expired, failed, or canceled)
+ */
+export const releaseExpiredReservations = internalMutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
+
+    // Find orders that are older than 30 minutes and still have "open" payment status
+    const expiredOrders = await ctx.db
+      .query("orders")
+      .filter((q) => 
+        q.and(
+          q.lt(q.field("_creationTime"), thirtyMinutesAgo),
+          q.eq(q.field("paymentStatus"), "open")
+        )
+      )
+      .collect();
+
+    console.log(`Found ${expiredOrders.length} expired orders to process`);
+
+    for (const order of expiredOrders) {
+      console.log(`Releasing stock for expired order: ${order.orderId}`);
+
+      // Release stock for all items in the order
+      for (const item of order.items) {
+        const variant = await ctx.db
+          .query("variants")
+          .withIndex("by_product_variant", (q) =>
+            q.eq("productId", item.productId).eq("variantId", item.variantId)
+          )
+          .first();
+
+        if (variant) {
+          // Log if we detect inconsistent reserved stock
+          if (variant.reserved < item.quantity) {
+            console.warn(
+              `Stock inconsistency detected for order ${order.orderId}: ` +
+              `variant ${variant._id} has reserved=${variant.reserved} but order item quantity=${item.quantity}. ` +
+              `This may indicate a race condition or double-processing.`
+            );
+          }
+
+          await ctx.db.patch(variant._id, {
+            reserved: Math.max(0, variant.reserved - item.quantity),
+          });
+
+          // Also release secondary stock if it exists
+          if (variant.secondaryStock) {
+            const secondaryVariant = await ctx.db.get(variant.secondaryStock);
+            if (secondaryVariant) {
+              const factor = variant.secondaryStockFactor ?? 1;
+              const secondaryQuantity = item.quantity * factor;
+
+              // Log if we detect inconsistent reserved stock for secondary
+              if (secondaryVariant.reserved < secondaryQuantity) {
+                console.warn(
+                  `Secondary stock inconsistency detected for order ${order.orderId}: ` +
+                  `secondary variant ${secondaryVariant._id} has reserved=${secondaryVariant.reserved} ` +
+                  `but needs to release ${secondaryQuantity}. This may indicate a race condition or double-processing.`
+                );
+              }
+
+              await ctx.db.patch(secondaryVariant._id, {
+                reserved: Math.max(0, secondaryVariant.reserved - secondaryQuantity),
+              });
+            }
+          }
+        }
+      }
+
+      // Mark order as expired
+      await ctx.db.patch(order._id, {
+        status: "expired",
+        paymentStatus: "expired",
+      });
+    }
+
+    return null;
+  },
+});
