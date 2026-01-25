@@ -277,13 +277,20 @@ export const updateOrderStatus = internalMutation({
       return null;
     }
 
+    // Check if status has already been updated to prevent duplicate stock operations
+    const previousPaymentStatus = order.paymentStatus;
+    if (previousPaymentStatus === args.status) {
+      console.log(`Order ${args.orderId} already has payment status ${args.status}, skipping duplicate processing`);
+      return null;
+    }
+
     // Update payment status
     await ctx.db.patch(order._id, {
       paymentStatus: args.status as any,
       status: args.status === "paid" ? "paid" : order.status,
     });
 
-    // Handle stock based on payment status
+    // Handle stock based on payment status (only if status changed)
     if (args.status === "paid") {
       // Payment successful: confirm purchase (decrement quantity and release reservation)
       for (const item of order.items) {
