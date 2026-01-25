@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useCart } from "@/context/CartContext";
-import { useAction } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { CustomFieldsEditor } from "@/components/product/CustomFieldsEditor";
 
@@ -24,9 +24,13 @@ export function CheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [comments, setComments] = useState("");
+  const [donationAmount, setDonationAmount] = useState<string>("");
   const [editingCustomFields, setEditingCustomFields] = useState<{
     cartItemId: string;
   } | null>(null);
+
+  // Fetch donation product for ID
+  const donationProduct = useQuery(api.products.getByProductId, { productId: "donation" });
 
   const [formData, setFormData] = useState({
     email: "",
@@ -52,7 +56,7 @@ export function CheckoutPage() {
   const itemsWithCustomFields = items.filter(
     (item) => item.customFields && item.customFields.length > 0
   );
-  const allAgreed = itemsWithAgreements.every((item) => 
+  const allAgreed = itemsWithAgreements.every((item) =>
     item.agreements && item.agreements.length > 0
   );
   const allCustomFieldsFilled = itemsWithCustomFields.every((item) => {
@@ -88,13 +92,29 @@ export function CheckoutPage() {
         .filter(Boolean)
         .join("\n");
 
+      // Prepare items array with optional donation
+      const checkoutItems = items.map((item) => ({
+        productId: item.productId,
+        variantId: item.variantId,
+        quantity: item.quantity,
+        customFieldResponses: item.customFieldResponses,
+        agreements: item.agreements,
+      }));
+
+      // Add donation if amount is specified and donation product exists
+      const donationValue = parseFloat(donationAmount);
+      if (donationProduct && !isNaN(donationValue) && donationValue > 0) {
+        checkoutItems.push({
+          productId: donationProduct._id,
+          variantId: donationValue.toFixed(2),
+          quantity: 1,
+          customFieldResponses: undefined,
+          agreements: undefined,
+        });
+      }
+
       const result = await processCheckout({
-        items: items.map((item) => ({
-          productId: item.productId,
-          variantId: item.variantId,
-          quantity: item.quantity,
-          customFieldResponses: item.customFieldResponses,
-        })),
+        items: checkoutItems,
         email: formData.email,
         name: `${formData.firstName} ${formData.lastName}`,
         comments: orderComments || undefined,
@@ -373,6 +393,76 @@ export function CheckoutPage() {
                 />
               </div>
 
+              {/* Donation Section */}
+              <div className="pt-4 space-y-4 border-t">
+                <div>
+                  <Label className="text-base font-semibold">Support SIB</Label>
+                  <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+                    We think it's important that our merch is affordable for all of our members. This means that we do not profit of the selling of the merch. Do you want to help us realise more merch, fun activities and interesting lectures in the future? You can choose to donate just a little extra with the merch you buy.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={donationAmount === "1" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setDonationAmount("1")}
+                  >
+                    € 1
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={donationAmount === "5" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setDonationAmount("5")}
+                  >
+                    € 5
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={donationAmount === "" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setDonationAmount("")}
+                  >
+                    No donation
+                  </Button>
+                  {(() => {
+                    const currentTotal = totalPrice;
+                    const nextRounded = Math.ceil(currentTotal / 5) * 5;
+                    const roundUpAmount = nextRounded - currentTotal;
+                    if (roundUpAmount > 0.01 && roundUpAmount < 5) {
+                      const isSelected = donationAmount === roundUpAmount.toFixed(2);
+                      return (
+                        <Button
+                          type="button"
+                          variant={isSelected ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setDonationAmount(roundUpAmount.toFixed(2))}
+                        >
+                          €{roundUpAmount.toFixed(2)} (rounds total to €{nextRounded})
+                        </Button>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+
+                <div>
+                  <Label htmlFor="customDonation">Or enter a custom amount</Label>
+                  <Input
+                    id="customDonation"
+                    name="customDonation"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={donationAmount}
+                    onChange={(e) => setDonationAmount(e.target.value)}
+                    placeholder="€ 0.00"
+                  />
+                </div>
+              </div>
+
               <div className="pt-4">
                 {error && (
                   <div className="mb-4 p-3 border border-destructive/50 bg-destructive/10 rounded-md flex items-start gap-2">
@@ -386,7 +476,11 @@ export function CheckoutPage() {
                   className="w-full"
                   disabled={isSubmitting || !canCheckout}
                 >
-                  {isSubmitting ? "Processing..." : `Complete Order - €${totalPrice.toFixed(2)}`}
+                  {isSubmitting ? "Processing..." : (() => {
+                    const donation = parseFloat(donationAmount) || 0;
+                    const total = totalPrice + (isNaN(donation) ? 0 : donation);
+                    return `Complete Order - €${total.toFixed(2)}`;
+                  })()}
                 </Button>
               </div>
             </form>

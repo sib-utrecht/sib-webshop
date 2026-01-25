@@ -57,8 +57,15 @@ export const createOrder = internalMutation({
       }
     }
 
-    // Validate stock availability for all items
+    // Validate stock availability for all items (skip donations)
     for (const item of args.items) {
+      const product = await ctx.db.get(item.productId);
+      
+      // Skip stock validation for donation products
+      if (product?.productId === "donation") {
+        continue;
+      }
+
       const variant = await ctx.db
         .query("variants")
         .withIndex("by_product_variant", (q) =>
@@ -76,7 +83,6 @@ export const createOrder = internalMutation({
       const available = await getAvailableStock(variant, (id) => ctx.db.get(id));
 
       if (available < item.quantity) {
-        const product = await ctx.db.get(item.productId);
         return {
           success: false,
           message: `Insufficient stock for ${product?.name || "item"}. Only ${available} available.`,
@@ -84,9 +90,16 @@ export const createOrder = internalMutation({
       }
     }
 
-    // Reserve stock for all items before creating the order
+    // Reserve stock for all items before creating the order (skip donations)
     const reservedItems: Array<{ productId: Doc<"products">["_id"]; variantId: string; quantity: number }> = [];
     for (const item of args.items) {
+      const product = await ctx.db.get(item.productId);
+      
+      // Skip stock reservation for donation products
+      if (product?.productId === "donation") {
+        continue;
+      }
+
       const reserveResult: { success: boolean; message: string } | null = await ctx.runMutation(internal.stock.reserveStock, {
         productId: item.productId,
         variantId: item.variantId,
@@ -137,7 +150,34 @@ export const createOrder = internalMutation({
         };
       }
 
-      // Fetch variant from variants table
+      // Handle donation products specially
+      if (product.productId === "donation") {
+        // For donations, the variantId is the amount in euros
+        const donationAmount = parseFloat(item.variantId);
+        if (isNaN(donationAmount) || donationAmount <= 0) {
+          return {
+            success: false,
+            message: `Invalid donation amount`,
+          };
+        }
+
+        totalAmount += donationAmount;
+
+        orderItems.push({
+          productId: item.productId,
+          productName: product.name,
+          variantId: item.variantId,
+          variantName: `€${donationAmount.toFixed(2)}`,
+          quantity: 1,
+          price: donationAmount,
+          customFieldResponses: item.customFieldResponses,
+          agreements: item.agreements,
+        });
+
+        continue;
+      }
+
+      // Fetch variant from variants table for non-donation products
       const variant = await ctx.db
         .query("variants")
         .withIndex("by_product_variant", (q) => 
@@ -330,6 +370,13 @@ export const updateOrderStatus = internalMutation({
     if (status === "paid") {
       // Payment successful: confirm purchase (decrement quantity and release reservation)
       for (const item of order.items) {
+        const product = await ctx.db.get(item.productId);
+        
+        // Skip stock operations for donation products
+        if (product?.productId === "donation") {
+          continue;
+        }
+
         await ctx.runMutation(internal.stock.confirmPurchase, {
           productId: item.productId,
           variantId: item.variantId,
@@ -345,6 +392,13 @@ export const updateOrderStatus = internalMutation({
     } else if (status === "expired" || status === "failed" || status === "canceled") {
       // Payment failed/expired/canceled: release reserved stock
       for (const item of order.items) {
+        const product = await ctx.db.get(item.productId);
+        
+        // Skip stock operations for donation products
+        if (product?.productId === "donation") {
+          continue;
+        }
+
         await ctx.runMutation(internal.stock.releaseStock, {
           productId: item.productId,
           variantId: item.variantId,
