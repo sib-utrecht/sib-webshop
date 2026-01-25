@@ -2,9 +2,6 @@ import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 
-const codeOfConductAgreement =
-  "I agree with the [Code of conduct](https://sib-utrecht.nl/code-of-conduct)";
-
 const codeOfConductAgreementPlusOne =
   "I agree with the [Code of conduct](https://sib-utrecht.nl/code-of-conduct), " +
   "and I, as a SIB member, am responsible for any +1's I bring to follow these rules.";

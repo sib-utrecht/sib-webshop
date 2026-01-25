@@ -240,7 +240,7 @@ export const confirmPurchase = internalMutation({
 export const releaseExpiredReservations = internalMutation({
   args: {},
   returns: v.null(),
-  handler: async (ctx, args) => {
+  handler: async (ctx, _args) => {
     const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
 
     // Find orders that are older than 30 minutes and still have "open" payment status
