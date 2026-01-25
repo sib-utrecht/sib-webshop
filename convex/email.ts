@@ -285,10 +285,6 @@ export const sendPaymentConfirmationToCustomer = internalAction({
                 <span>Total Paid: €${args.totalAmount.toFixed(2)}</span>
               </div>
 
-              <div style="margin-top: 30px; padding: 15px; background-color: #d1fae5; border-left: 4px solid #059669; border-radius: 4px;">
-                <p style="margin: 0;"><strong>✓ Order Confirmed:</strong> You will receive further information about your order via email.</p>
-              </div>
-
               <p style="margin-top: 30px;">If you have any questions, please contact us at <a href="mailto:${CUSTOMER_SERVICE_EMAIL}" style="color: #1e40af;">${CUSTOMER_SERVICE_EMAIL}</a>.</p>
 
               <p>Best regards,<br/>
