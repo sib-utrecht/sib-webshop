@@ -1,6 +1,17 @@
-import { query, mutation } from "./_generated/server";
-import { v } from "convex/values";
+import { query, mutation, internalQuery } from "./_generated/server";
+import { Infer, v } from "convex/values";
 import { requireAdmin } from "./auth";
+import { internal } from "./_generated/api";
+
+// Generate a secure random token for sharing
+function getRandomToken(): string {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let token = "";
+  for (let i = 0; i < 32; i++) {
+    token += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return token;
+}
 
 // Validator for view filters
 const viewFiltersValidator = v.optional(v.object({
@@ -18,6 +29,7 @@ const viewValidator = v.object({
   filters: viewFiltersValidator,
   sortBy: v.optional(v.string()),
   sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
+  shareToken: v.optional(v.string()),
 });
 
 /**
@@ -136,14 +148,15 @@ const orderItemRowValidator = v.object({
 });
 
 /**
- * Execute a view and return flattened order items (admin only)
+ * Internal query to execute a view given a view object
+ * This is the shared logic used by both execute and executeByShareToken
  */
-export const execute = query({
-  args: { viewId: v.id("views") },
+export const executeViewInternal = internalQuery({
+  args: { 
+    viewId: v.id("views"),
+  },
   returns: v.array(orderItemRowValidator),
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
-    
     const view = await ctx.db.get(args.viewId);
     if (!view) {
       throw new Error("View not found");
@@ -243,5 +256,102 @@ export const execute = query({
     }
     
     return filteredRows;
+  },
+});
+
+/**
+ * Execute a view and return flattened order items (admin only)
+ */
+export const execute = query({
+  args: { viewId: v.id("views") },
+  returns: v.array(orderItemRowValidator),
+  handler: async (ctx, args): Promise<Array<Infer<typeof orderItemRowValidator>>> => {
+    await requireAdmin(ctx);
+    
+    const view = await ctx.db.get(args.viewId);
+    if (!view) {
+      throw new Error("View not found");
+    }
+    
+    return await ctx.runQuery(internal.views.executeViewInternal, { viewId: args.viewId });
+  },
+});
+
+/**
+ * Generate or regenerate a share token for a view (admin only)
+ */
+export const generateShareToken = mutation({
+  args: { viewId: v.id("views") },
+  returns: v.string(),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    
+    const view = await ctx.db.get(args.viewId);
+    if (!view) {
+      throw new Error("View not found");
+    }
+    
+    const shareToken = getRandomToken();
+    await ctx.db.patch(args.viewId, { shareToken });
+    
+    return shareToken;
+  },
+});
+
+/**
+ * Disable sharing for a view by removing the share token (admin only)
+ */
+export const disableSharing = mutation({
+  args: { viewId: v.id("views") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    
+    const view = await ctx.db.get(args.viewId);
+    if (!view) {
+      throw new Error("View not found");
+    }
+    
+    await ctx.db.patch(args.viewId, { shareToken: undefined });
+    
+    return null;
+  },
+});
+
+/**
+ * Get a view by share token (public, no authentication required)
+ */
+export const getByShareToken = query({
+  args: { shareToken: v.string() },
+  returns: v.union(viewValidator, v.null()),
+  handler: async (ctx, args) => {
+    // No authentication required - this is a public endpoint
+    const view = await ctx.db
+      .query("views")
+      .withIndex("by_share_token", (q) => q.eq("shareToken", args.shareToken))
+      .first();
+    
+    return view || null;
+  },
+});
+
+/**
+ * Execute a view by share token (public, no authentication required)
+ */
+export const executeByShareToken = query({
+  args: { shareToken: v.string() },
+  returns: v.array(orderItemRowValidator),
+  handler: async (ctx, args): Promise<Array<Infer<typeof orderItemRowValidator>>> => {
+    // No authentication required - this is a public endpoint
+    const view = await ctx.db
+      .query("views")
+      .withIndex("by_share_token", (q) => q.eq("shareToken", args.shareToken))
+      .first();
+    
+    if (!view) {
+      throw new Error("View not found or sharing is disabled");
+    }
+    
+    return await ctx.runQuery(internal.views.executeViewInternal, { viewId: view._id });
   },
 });

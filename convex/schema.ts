@@ -107,5 +107,8 @@ export default defineSchema({
     })),
     sortBy: v.optional(v.string()), // Column ID to sort by
     sortOrder: v.optional(v.union(v.literal("asc"), v.literal("desc"))),
-  }).index("by_name", ["name"]),
+    shareToken: v.optional(v.string()), // Secure token for public sharing
+  })
+    .index("by_name", ["name"])
+    .index("by_share_token", ["shareToken"]),
 });

@@ -44,3 +44,17 @@ export function formatUnixTimestamp(timestamp: number): string {
   const seconds = String(date.getSeconds()).padStart(2, '0');
   return `${day} ${month} ${year}, ${hours}:${minutes}:${seconds}`;
 }
+
+/**
+ * Validate a share token format (32-character lowercase alphanumeric)
+ */
+export function isValidShareToken(token: string | undefined): boolean {
+  return !!token && /^[a-z0-9]{32}$/.test(token);
+}
+
+/**
+ * Build a share URL for a given token
+ */
+export function buildShareUrl(token: string): string {
+  return `${window.location.origin}/shared/${token}`;
+}
