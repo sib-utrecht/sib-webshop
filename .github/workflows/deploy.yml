@@ -33,6 +33,11 @@ jobs:
         run: npm ci
 
       - name: Build
+        env:
+          VITE_CONVEX_URL: https://convex-shop.sib-utrecht.nl
+          VITE_COGNITO_USER_POOL_ID: eu-central-1_Ecd3uxa0G
+          VITE_COGNITO_CLIENT_ID: 3saoma3t11p04k0j3se6jvenab
+          
         run: npm run build --if-present
 
       - name: Add CNAME for custom domain
