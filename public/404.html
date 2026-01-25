@@ -17,6 +17,8 @@
       // https://username.github.io/repo-name/one/two?a=b&c=d#qwe becomes
       // https://username.github.io/repo-name/?/one/two&a=b~and~c=d#qwe
       // Otherwise, leave pathSegmentsToKeep as 0.
+      // For this deployment, we use a custom domain (shop.sib-utrecht.nl),
+      // so pathSegmentsToKeep should be 0.
       var pathSegmentsToKeep = 0;
 
       var l = window.location;
