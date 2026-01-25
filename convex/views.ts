@@ -5,7 +5,7 @@ import { Doc } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 
 // Generate a secure random token for sharing
-function generateShareToken(): string {
+function getRandomToken(): string {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
   let token = "";
   for (let i = 0; i < 32; i++) {
@@ -292,7 +292,7 @@ export const generateShareToken = mutation({
       throw new Error("View not found");
     }
     
-    const shareToken = generateShareToken();
+    const shareToken = getRandomToken();
     await ctx.db.patch(args.viewId, { shareToken });
     
     return shareToken;
