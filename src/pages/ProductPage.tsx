@@ -210,7 +210,13 @@ export function ProductPage() {
 
           {product.description && (
             <div className="mt-4 text-muted-foreground prose prose-sm max-w-none">
-              <ReactMarkdown>{product.description}</ReactMarkdown>
+              <ReactMarkdown
+                components={{
+                  a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />
+                }}
+              >
+                {product.description}
+              </ReactMarkdown>
             </div>
           )}
 
@@ -296,7 +302,13 @@ export function ProductPage() {
                   />
                   <Label htmlFor={`agreement-${index}`} className="text-sm cursor-pointer">
                     <span className="inline">
-                      <ReactMarkdown>{agreement}</ReactMarkdown>
+                      <ReactMarkdown
+                        components={{
+                          a: ({ node, ...props }) => <a {...props} target="_blank" rel="noopener" />
+                        }}
+                      >
+                        {agreement}
+                      </ReactMarkdown>
                     </span>
                   </Label>
                 </div>
