@@ -1,11 +1,22 @@
 import { mutation, internalMutation, action } from "./_generated/server";
-import { v } from "convex/values";
+import { Infer, v } from "convex/values";
 import { internal } from "./_generated/api";
+import { Doc } from "./_generated/dataModel";
 import { getAvailableStock } from "./stockHelpers";
 
 /**
  * Create an order (internal use - called by processCheckout action)
  */
+const createOrderReturnValidator = v.object({
+  success: v.boolean(),
+  message: v.string(),
+  orderId: v.optional(v.string()),
+  orderDbId: v.optional(v.id("orders")),
+  name: v.optional(v.string()),
+  email: v.optional(v.string()),
+  totalAmount: v.optional(v.number()),
+});
+
 export const createOrder = internalMutation({
   args: {
     items: v.array(
@@ -20,16 +31,8 @@ export const createOrder = internalMutation({
     name: v.string(),
     comments: v.optional(v.string()),
   },
-  returns: v.object({
-    success: v.boolean(),
-    message: v.string(),
-    orderId: v.optional(v.string()),
-    orderDbId: v.optional(v.id("orders")),
-    name: v.optional(v.string()),
-    email: v.optional(v.string()),
-    totalAmount: v.optional(v.number()),
-  }),
-  handler: async (ctx, args) => {
+  returns: createOrderReturnValidator,
+  handler: async (ctx, args): Promise<Infer<typeof createOrderReturnValidator>> => {
     // Validate quantities are positive integers
     for (const item of args.items) {
       const quantity = Math.floor(Math.abs(item.quantity));
@@ -69,9 +72,9 @@ export const createOrder = internalMutation({
     }
 
     // Reserve stock for all items before creating the order
-    const reservedItems: Array<{ productId: any; variantId: string; quantity: number }> = [];
+    const reservedItems: Array<{ productId: Doc<"products">["_id"]; variantId: string; quantity: number }> = [];
     for (const item of args.items) {
-      const reserveResult = await ctx.runMutation(internal.stock.reserveStock, {
+      const reserveResult: { success: boolean; message: string } | null = await ctx.runMutation(internal.stock.reserveStock, {
         productId: item.productId,
         variantId: item.variantId,
         quantity: item.quantity,
