@@ -49,11 +49,6 @@ export function ProductCard({
         <CardContent className="flex-1 p-4">
           <div className="flex items-start justify-between gap-2">
             <h3 className="font-semibold line-clamp-1">{name}</h3>
-            {isVirtual && (
-              <Badge variant="secondary" className="shrink-0">
-                Virtual
-              </Badge>
-            )}
           </div>
           <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
             {shortDescription || description || ""}

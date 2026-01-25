@@ -196,11 +196,6 @@ export function ProductPage() {
         <div className="flex flex-col">
           <div className="flex items-start justify-between gap-4">
             <h1 className="text-3xl font-bold tracking-tight">{product.name}</h1>
-            {product.isVirtual && (
-              <Badge variant="secondary" className="shrink-0 text-sm">
-                Virtual
-              </Badge>
-            )}
           </div>
 
           {product.description && (
