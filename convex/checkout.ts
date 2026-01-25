@@ -298,6 +298,8 @@ export const updateOrderStatus = internalMutation({
       return null;
     }
 
+    console.log(`Updating order ${args.orderId} to payment status: ${args.status}`);
+
     // Check if status has already been updated to prevent duplicate stock operations
     // Note: This is safe from race conditions because Convex mutations run in transactions,
     // ensuring that concurrent webhook calls will be serialized and only the first will pass this check.
@@ -307,14 +309,21 @@ export const updateOrderStatus = internalMutation({
       return null;
     }
 
+    const status = args.status;
+    if (status != "paid" && status != "pending" && status != "canceled" && status != "expired" && status != "failed") {
+      console.error(`Unknown payment status: ${status} for orderId: ${args.orderId}`);
+      return null;
+    }
+
     // Update payment status
     await ctx.db.patch(order._id, {
-      paymentStatus: args.status as any,
-      status: args.status === "paid" ? "paid" : order.status,
+      paymentStatus: status,
+      status: status,
     });
 
+
     // Handle stock based on payment status (only if status changed)
-    if (args.status === "paid") {
+    if (status === "paid") {
       // Payment successful: confirm purchase (decrement quantity and release reservation)
       for (const item of order.items) {
         await ctx.runMutation(internal.stock.confirmPurchase, {
@@ -329,7 +338,7 @@ export const updateOrderStatus = internalMutation({
       await ctx.scheduler.runAfter(0, internal.checkout.sendPaymentConfirmationEmails, {
         orderDbId: order._id,
       });
-    } else if (args.status === "expired" || args.status === "failed" || args.status === "canceled") {
+    } else if (status === "expired" || status === "failed" || status === "canceled") {
       // Payment failed/expired/canceled: release reserved stock
       for (const item of order.items) {
         await ctx.runMutation(internal.stock.releaseStock, {

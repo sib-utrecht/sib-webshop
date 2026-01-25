@@ -79,7 +79,7 @@ export default defineSchema({
       v.literal("completed"),
       v.literal("pending"),
       v.literal("paid"),
-      v.literal("cancelled"),
+      v.literal("canceled"),
       v.literal("expired"),
       v.literal("failed")
     ),

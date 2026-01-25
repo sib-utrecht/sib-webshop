@@ -65,7 +65,7 @@ const AVAILABLE_COLUMNS = [
   { id: "itemTotal", label: "Item Total" },
 ];
 
-const ORDER_STATUSES = ["completed", "pending", "paid", "cancelled", "expired", "failed"];
+const ORDER_STATUSES = ["completed", "pending", "paid", "canceled", "expired", "failed"];
 
 export function ViewDetailPage() {
   const { viewId } = useParams<{ viewId: string }>();

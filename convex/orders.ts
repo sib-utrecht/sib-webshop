@@ -155,7 +155,7 @@ export const list = query({
         v.literal("completed"),
         v.literal("pending"),
         v.literal("paid"),
-        v.literal("cancelled"),
+        v.literal("canceled"),
         v.literal("expired"),
         v.literal("failed")
       ),
@@ -206,7 +206,7 @@ export const getByOrderId = query({
         v.literal("completed"),
         v.literal("pending"),
         v.literal("paid"),
-        v.literal("cancelled"),
+        v.literal("canceled"),
         v.literal("expired"),
         v.literal("failed")
       ),
@@ -267,7 +267,7 @@ export const getOrderSecure = query({
         v.literal("completed"),
         v.literal("pending"),
         v.literal("paid"),
-        v.literal("cancelled"),
+        v.literal("canceled"),
         v.literal("expired"),
         v.literal("failed")
       ),

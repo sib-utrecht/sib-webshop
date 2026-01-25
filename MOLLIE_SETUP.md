@@ -74,7 +74,7 @@ For local development, you can use a tool like [ngrok](https://ngrok.com/) to ex
 ### Order Status
 - `pending`: Order created, awaiting payment
 - `paid`: Payment successful, stock decremented
-- `cancelled`: Order cancelled
+- `canceled`: Order canceled
 - `expired`: Payment expired
 - `failed`: Payment failed
 
@@ -84,7 +84,7 @@ For local development, you can use a tool like [ngrok](https://ngrok.com/) to ex
 - `paid`: Payment successful
 - `expired`: Payment link expired
 - `failed`: Payment failed
-- `canceled`: Payment cancelled by user
+- `canceled`: Payment canceled by user
 
 ## Testing Payment Methods
 
