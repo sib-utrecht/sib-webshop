@@ -15,7 +15,7 @@ export function ProductPage() {
     api.products.getByProductId,
     productId ? { productId } : "skip"
   );
-  
+
   const { addItem, items } = useCart();
   const [justAdded, setJustAdded] = useState(false);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
@@ -35,7 +35,15 @@ export function ProductPage() {
   // Reset custom fields when variant changes
   const handleVariantChange = (variantId: string) => {
     setSelectedVariantId(variantId);
-    setCustomFieldResponses({});
+    setCustomFieldResponses((prev) => {
+      if (!product) return {};
+      const newVariant = product.variants.find((v) => v.variantId === variantId);
+      if (!newVariant || !newVariant.customFields || newVariant.customFields.length === 0) {
+        return {};
+      }
+      const allowed = new Set(newVariant.customFields.map((f) => f.label));
+      return Object.fromEntries(Object.entries(prev).filter(([k]) => allowed.has(k)));
+    });
     setShowFieldValidation(false);
     setAgreedToTerms([]);
   };
@@ -54,13 +62,13 @@ export function ProductPage() {
     }
     return total;
   }, 0);
-  
+
   const canAddToCart = () => {
     if (!product || !selectedVariant) return false;
-    
+
     // Check stock availability
     if (selectedVariant.available <= 0) return false;
-    
+
     // Check required agreements
     if (selectedVariant.requiredAgreements && selectedVariant.requiredAgreements.length > 0) {
       if (agreedToTerms.length !== selectedVariant.requiredAgreements.length) {
@@ -70,7 +78,7 @@ export function ProductPage() {
         return false;
       }
     }
-    
+
     // Check required custom fields
     if (selectedVariant.customFields && selectedVariant.customFields.length > 0) {
       const allRequiredFieldsFilled = selectedVariant.customFields.every((field) => {
@@ -79,7 +87,7 @@ export function ProductPage() {
       });
       if (!allRequiredFieldsFilled) return false;
     }
-    
+
     // Check max quantity
     if (selectedVariant.maxQuantity && amountInCart >= selectedVariant.maxQuantity) {
       return false;
@@ -89,7 +97,7 @@ export function ProductPage() {
 
   const handleAddToCart = () => {
     if (!product || !selectedVariant) return;
-    
+
     // Show validation if custom fields are not filled
     if (!canAddToCart()) {
       setShowFieldValidation(true);
@@ -100,7 +108,7 @@ export function ProductPage() {
     const agreements = selectedVariant.requiredAgreements && agreedToTerms.length > 0
       ? agreedToTerms
       : undefined;
-    
+
     addItem({
       productId: product._id,
       variantId: selectedVariant.variantId,
@@ -115,7 +123,7 @@ export function ProductPage() {
       customFields: selectedVariant.customFields,
       customFieldResponses: customFieldResponses,
     });
-    
+
     // Reset fields after adding to cart
     setCustomFieldResponses({});
     setAgreedToTerms([]);
@@ -187,9 +195,8 @@ export function ProductPage() {
                 <button
                   key={index}
                   onClick={() => setSelectedImage(img)}
-                  className={`aspect-square overflow-hidden rounded-md bg-muted border-2 transition-colors cursor-pointer ${
-                    selectedImage === img ? "border-primary" : "border-transparent"
-                  }`}
+                  className={`aspect-square overflow-hidden rounded-md bg-muted border-2 transition-colors cursor-pointer ${selectedImage === img ? "border-primary" : "border-transparent"
+                    }`}
                 >
                   <img
                     src={img}
@@ -230,7 +237,7 @@ export function ProductPage() {
                 {product.variants.map((variant) => {
                   const isOutOfStock = variant.available <= 0;
                   const isLowStock = variant.available > 0 && variant.available <= 5 && variant.available < 999999;
-                  
+
                   return (
                     <Button
                       key={variant.variantId}
@@ -277,6 +284,21 @@ export function ProductPage() {
             )}
           </div>
 
+          {/* Custom Fields */}
+          {selectedVariant?.customFields && selectedVariant.customFields.length > 0 && (
+            <div className="mt-6 p-4 border rounded-lg bg-muted/50">
+              <h3 className="font-semibold mb-3">Additional Information</h3>
+              <CustomFieldsEditor
+                fields={selectedVariant.customFields}
+                responses={customFieldResponses}
+                onResponseChange={(label, value) =>
+                  setCustomFieldResponses((prev) => ({ ...prev, [label]: value }))
+                }
+                showValidation={showFieldValidation}
+              />
+            </div>
+          )}
+
           {/* Required Agreements */}
           {selectedVariant?.requiredAgreements && selectedVariant.requiredAgreements.length > 0 && (
             <div className="mt-6 space-y-2 p-4 border rounded-lg bg-muted/50">
@@ -316,24 +338,22 @@ export function ProductPage() {
             </div>
           )}
 
-          {/* Custom Fields */}
-          {selectedVariant?.customFields && selectedVariant.customFields.length > 0 && (
-            <div className="mt-6 p-4 border rounded-lg bg-muted/50">
-              <h3 className="font-semibold mb-3">Additional Information</h3>
-              <CustomFieldsEditor
-                fields={selectedVariant.customFields}
-                responses={customFieldResponses}
-                onResponseChange={(label, value) =>
-                  setCustomFieldResponses((prev) => ({ ...prev, [label]: value }))
-                }
-                showValidation={showFieldValidation}
-              />
-            </div>
-          )}
-
           {/* Add to Cart */}
           <div className="mt-8 flex flex-col gap-4">
             <div className="flex flex-col sm:flex-row gap-2">
+              {items.length > 0 && (
+                <Button
+                  size="lg"
+                  variant="outline"
+                  asChild
+                  className="flex-1"
+                >
+                  <Link to="/checkout">
+                    Go to Cart
+                  </Link>
+                </Button>
+              )}
+
               <Button
                 size="lg"
                 onClick={handleAddToCart}
@@ -352,27 +372,10 @@ export function ProductPage() {
                   </>
                 )}
               </Button>
-              
-              {items.length > 0 && (
-                <Button
-                  size="lg"
-                  variant="outline"
-                  asChild
-                  className="flex-1"
-                >
-                  <Link to="/checkout">
-                    Go to Cart
-                  </Link>
-                </Button>
-              )}
+
+
             </div>
 
-            {!canAddToCart() && selectedVariant?.requiredAgreements && agreedToTerms.length !== selectedVariant.requiredAgreements.length && (
-              <p className="text-sm text-destructive">
-                Please agree to the terms above to continue
-              </p>
-            )}
-            
             {!canAddToCart() && selectedVariant && selectedVariant.available <= 0 && (
               <p className="text-sm text-destructive">
                 This item is currently out of stock
