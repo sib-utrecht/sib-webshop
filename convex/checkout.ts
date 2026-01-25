@@ -1,4 +1,4 @@
-import { mutation, internalMutation, action } from "./_generated/server";
+import { mutation, internalMutation, action, internalAction, internalQuery } from "./_generated/server";
 import { Infer, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Doc } from "./_generated/dataModel";
@@ -15,6 +15,17 @@ const createOrderReturnValidator = v.object({
   name: v.optional(v.string()),
   email: v.optional(v.string()),
   totalAmount: v.optional(v.number()),
+  items: v.optional(v.array(
+    v.object({
+      productId: v.id("products"),
+      productName: v.string(),
+      variantId: v.string(),
+      variantName: v.string(),
+      quantity: v.number(),
+      price: v.number(),
+      customFieldResponses: v.optional(v.record(v.string(), v.string())),
+    })
+  )),
 });
 
 export const createOrder = internalMutation({
@@ -173,6 +184,7 @@ export const createOrder = internalMutation({
       name: args.name,
       email: args.email,
       totalAmount,
+      items: orderItems,
     };
   },
 });
@@ -229,6 +241,12 @@ export const processCheckout = action({
         orderId: orderResult.orderId,
       };
     }
+
+    // Step 3: Schedule new order notification email to webshop maintainer
+    // Using scheduler ensures the email will be sent even if this action completes quickly
+    await ctx.scheduler.runAfter(0, internal.checkout.sendNewOrderNotification, {
+      orderDbId: orderResult.orderDbId,
+    });
 
     return {
       success: true,
@@ -305,6 +323,12 @@ export const updateOrderStatus = internalMutation({
           quantity: item.quantity,
         });
       }
+
+      // Send payment confirmation emails (customer + maintainer)
+      // Note: We schedule these to run asynchronously
+      await ctx.scheduler.runAfter(0, internal.checkout.sendPaymentConfirmationEmails, {
+        orderDbId: order._id,
+      });
     } else if (args.status === "expired" || args.status === "failed" || args.status === "canceled") {
       // Payment failed/expired/canceled: release reserved stock
       for (const item of order.items) {
@@ -314,6 +338,137 @@ export const updateOrderStatus = internalMutation({
           quantity: item.quantity,
         });
       }
+    }
+
+    return null;
+  },
+});
+
+/**
+ * Get full order details for email notifications (internal query)
+ */
+export const getFullOrderDetails = internalQuery({
+  args: {
+    orderDbId: v.id("orders"),
+  },
+  returns: v.union(
+    v.object({
+      orderId: v.string(),
+      name: v.string(),
+      email: v.string(),
+      comments: v.optional(v.string()),
+      items: v.array(
+        v.object({
+          productName: v.string(),
+          variantName: v.string(),
+          quantity: v.number(),
+          price: v.number(),
+          customFieldResponses: v.optional(v.record(v.string(), v.string())),
+        })
+      ),
+      totalAmount: v.number(),
+    }),
+    v.null()
+  ),
+  handler: async (ctx, args) => {
+    const order = await ctx.db.get(args.orderDbId);
+
+    if (!order) {
+      return null;
+    }
+
+    return {
+      orderId: order.orderId,
+      name: order.name,
+      email: order.email,
+      comments: order.comments,
+      items: order.items.map(item => ({
+        productName: item.productName,
+        variantName: item.variantName,
+        quantity: item.quantity,
+        price: item.price,
+        customFieldResponses: item.customFieldResponses,
+      })),
+      totalAmount: order.totalAmount,
+    };
+  },
+});
+
+/**
+ * Send new order notification email (internal action wrapper)
+ */
+export const sendNewOrderNotification = internalAction({
+  args: {
+    orderDbId: v.id("orders"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Fetch full order details
+    const order = await ctx.runQuery(internal.checkout.getFullOrderDetails, {
+      orderDbId: args.orderDbId,
+    });
+
+    if (!order) {
+      console.error("Order not found for email notification:", args.orderDbId);
+      return null;
+    }
+
+    // Send email
+    const result = await ctx.runAction(internal.email.sendNewOrderEmail, {
+      orderId: order.orderId,
+      name: order.name,
+      email: order.email,
+      items: order.items,
+      totalAmount: order.totalAmount,
+      comments: order.comments,
+    });
+
+    if (!result.success) {
+      console.error("Failed to send new order email:", result.error);
+    }
+
+    return null;
+  },
+});
+
+/**
+ * Send payment confirmation emails (internal action wrapper)
+ */
+export const sendPaymentConfirmationEmails = internalAction({
+  args: {
+    orderDbId: v.id("orders"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Fetch full order details
+    const order = await ctx.runQuery(internal.checkout.getFullOrderDetails, {
+      orderDbId: args.orderDbId,
+    });
+
+    if (!order) {
+      console.error("Order not found for email notification:", args.orderDbId);
+      return null;
+    }
+
+    const emailData = {
+      orderId: order.orderId,
+      name: order.name,
+      email: order.email,
+      items: order.items,
+      totalAmount: order.totalAmount,
+      comments: order.comments,
+    };
+
+    // Send to customer
+    const customerResult = await ctx.runAction(internal.email.sendPaymentConfirmationToCustomer, emailData);
+    if (!customerResult.success) {
+      console.error("Failed to send payment confirmation to customer:", customerResult.error);
+    }
+
+    // Send to maintainer
+    const maintainerResult = await ctx.runAction(internal.email.sendPaymentConfirmationToMaintainer, emailData);
+    if (!maintainerResult.success) {
+      console.error("Failed to send payment confirmation to maintainer:", maintainerResult.error);
     }
 
     return null;
