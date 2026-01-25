@@ -1,4 +1,4 @@
-import { query, internalQuery, action, internalAction } from "./_generated/server";
+import { query, internalQuery, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { requireAdmin } from "./auth";
 import { internal } from "./_generated/api";

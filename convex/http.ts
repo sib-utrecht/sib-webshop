@@ -8,7 +8,7 @@ const http = httpRouter();
 http.route({
   path: "/helloworld",
   method: "GET",
-  handler: httpAction(async (ctx, req) => {
+  handler: httpAction(async (_ctx, _req) => {
     return new Response("Hello, world!", { status: 200 });
   }),
 })

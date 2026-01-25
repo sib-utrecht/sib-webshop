@@ -1,5 +1,6 @@
 import { query, mutation, internalQuery } from "./_generated/server";
-import { Infer, v } from "convex/values";
+import type { Infer } from "convex/values";
+import { v } from "convex/values";
 import { requireAdmin } from "./auth";
 import { internal } from "./_generated/api";
 
@@ -196,8 +197,7 @@ export const executeViewInternal = internalQuery({
     // Apply variant filter using variant database IDs
     let filteredRows = rows;
     if (view.filters?.variantIds && view.filters.variantIds.length > 0) {
-      // Create a map of variant IDs to their productId-variantId for quick lookup
-      const variantIdSet = new Set(view.filters.variantIds);
+      // Create a map of variant DB ids to their productId-variantId for quick lookup
       const variantMap = new Map<string, boolean>();
       
       // Load all the filtered variants to get their productId and variantId

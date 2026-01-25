@@ -1,4 +1,4 @@
-import { QueryCtx, MutationCtx } from "./_generated/server";
+import type { QueryCtx, MutationCtx } from "./_generated/server";
 
 /**
  * Check if the current user is authenticated and is a member of the "admins" group.

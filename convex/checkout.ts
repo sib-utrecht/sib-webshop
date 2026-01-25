@@ -1,7 +1,8 @@
-import { mutation, internalMutation, action, internalAction, internalQuery } from "./_generated/server";
-import { Infer, v } from "convex/values";
+import { internalMutation, action, internalAction, internalQuery } from "./_generated/server";
+import type { Infer } from "convex/values";
+import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { Doc } from "./_generated/dataModel";
+import type { Doc } from "./_generated/dataModel";
 import { getAvailableStock } from "./stockHelpers";
 
 /**

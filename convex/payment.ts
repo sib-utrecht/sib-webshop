@@ -1,9 +1,8 @@
 "use node";
 
-import { action, internalAction } from "./_generated/server";
+import { internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { createMollieClient } from "@mollie/api-client";
-import { internal, api } from "./_generated/api";
 
 /**
  * Create a Mollie payment for an order
@@ -22,7 +21,7 @@ export const generatePaymentUrl = internalAction({
     paymentId: v.optional(v.string()),
     message: v.string(),
   }),
-  handler: async (ctx, args): Promise<{ success: boolean; checkoutUrl?: string; paymentId?: string; message: string }> => {
+  handler: async (_ctx, args): Promise<{ success: boolean; checkoutUrl?: string; paymentId?: string; message: string }> => {
     // Check if this should be a test payment (name contains "TEST")
     const isTestPayment = args.name.includes("TEST");
 
@@ -101,7 +100,7 @@ export const fetchMolliePayment = internalAction({
     status: v.string(),
     message: v.optional(v.string()),
   }),
-  handler: async (ctx, args): Promise<{ success: boolean; paymentId: string; orderId?: string; status: string; message?: string }> => {
+  handler: async (_ctx, args): Promise<{ success: boolean; paymentId: string; orderId?: string; status: string; message?: string }> => {
     // Determine if this is a test payment based on orderId suffix
     const isTestPayment = args.orderId?.endsWith("_TEST") ?? false;
     

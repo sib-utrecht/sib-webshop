@@ -98,7 +98,6 @@ export function ViewDetailPage() {
   // Local state for editing
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
   const [selectedVariantIds, setSelectedVariantIds] = useState<Id<"variants">[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);

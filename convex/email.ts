@@ -3,7 +3,6 @@
 import { internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
-import type { Doc } from "./_generated/dataModel";
 
 // Initialize AWS SES client
 const getSESClient = () => {
@@ -111,7 +110,7 @@ export const sendNewOrderEmail = internalAction({
     messageId: v.optional(v.string()),
     error: v.optional(v.string()),
   }),
-  handler: async (ctx, args) => {
+  handler: async (_ctx, args) => {
     try {
       const sesClient = getSESClient();
 
@@ -249,7 +248,7 @@ export const sendPaymentConfirmationToCustomer = internalAction({
     messageId: v.optional(v.string()),
     error: v.optional(v.string()),
   }),
-  handler: async (ctx, args) => {
+  handler: async (_ctx, args) => {
     try {
       const sesClient = getSESClient();
 
@@ -398,7 +397,7 @@ export const sendPaymentConfirmationToMaintainer = internalAction({
     messageId: v.optional(v.string()),
     error: v.optional(v.string()),
   }),
-  handler: async (ctx, args) => {
+  handler: async (_ctx, args) => {
     try {
       const sesClient = getSESClient();
 
