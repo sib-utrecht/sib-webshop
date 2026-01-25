@@ -30,7 +30,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
 // Type for flattened order item row (matching the validator in convex/views.ts)
 interface OrderItemRow {
@@ -611,7 +610,7 @@ export function ViewDetailPage() {
       {/* Column Badges */}
       <div className="mb-4 p-4 border rounded-lg bg-muted/20">
           <Label className="text-sm font-medium mb-3 block">Columns</Label>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 mb-4">
             {AVAILABLE_COLUMNS.map((column) => {
               const isSelected = selectedColumns.includes(column.id);
               const isProductColumn = column.id === "productName";
@@ -727,6 +726,45 @@ export function ViewDetailPage() {
               );
             })}
           </div>
+          
+          {/* Custom Field Badges */}
+          {rows && rows.length > 0 && (() => {
+            const customFieldLabels = new Set<string>();
+            rows.forEach((row) => {
+              if (row.customFieldResponses) {
+                Object.keys(row.customFieldResponses).forEach((label) => {
+                  customFieldLabels.add(label);
+                });
+              }
+            });
+            
+            if (customFieldLabels.size === 0) return null;
+            
+            return (
+              <div className="pt-3 border-t">
+                <Label className="text-sm font-medium mb-3 block">Custom Fields</Label>
+                <div className="flex flex-wrap gap-2">
+                  {Array.from(customFieldLabels).sort().map((label) => {
+                    const columnId = `customField_${label}`;
+                    const isSelected = selectedColumns.includes(columnId);
+                    
+                    return (
+                      <Badge
+                        key={columnId}
+                        variant={isSelected ? "outline" : "secondary"}
+                        className={`cursor-pointer transition-all ${
+                          isSelected ? "opacity-100" : "opacity-60 hover:opacity-100"
+                        }`}
+                        onClick={() => handleColumnToggle(columnId)}
+                      >
+                        {label}
+                      </Badge>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
