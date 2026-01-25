@@ -14,7 +14,6 @@ const variantValidator = v.object({
   requiredAgreements: v.optional(v.array(v.string())),
   customFields: v.optional(v.array(
     v.object({
-      fieldId: v.string(),
       label: v.string(),
       type: v.union(v.literal("text"), v.literal("email"), v.literal("tel"), v.literal("textarea")),
       required: v.boolean(),
@@ -181,7 +180,6 @@ export const create = mutation({
         requiredAgreements: v.optional(v.array(v.string())),
         customFields: v.optional(v.array(
           v.object({
-            fieldId: v.string(),
             label: v.string(),
             type: v.union(v.literal("text"), v.literal("email"), v.literal("tel"), v.literal("textarea")),
             required: v.boolean(),
@@ -257,7 +255,6 @@ export const update = mutation({
         requiredAgreements: v.optional(v.array(v.string())),
         customFields: v.optional(v.array(
           v.object({
-            fieldId: v.string(),
             label: v.string(),
             type: v.union(v.literal("text"), v.literal("email"), v.literal("tel"), v.literal("textarea")),
             required: v.boolean(),

@@ -223,8 +223,8 @@ export const executeViewInternal = internalQuery({
       const getFieldValue = (row: typeof filteredRows[0], fieldName: string): string | number => {
         // Check if it's a custom field
         if (fieldName.startsWith("customField_")) {
-          const fieldId = fieldName.substring("customField_".length);
-          return row.customFieldResponses?.[fieldId] || "";
+          const label = fieldName.substring("customField_".length);
+          return row.customFieldResponses?.[label] || "";
         }
         
         // Access the field directly by name

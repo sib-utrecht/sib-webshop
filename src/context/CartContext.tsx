@@ -15,7 +15,6 @@ export interface CartItem {
   requiredAgreements?: string[];
   agreements?: string[]; // Timestamped agreement strings
   customFields?: Array<{
-    fieldId: string;
     label: string;
     type: "text" | "email" | "tel" | "textarea";
     required: boolean;
@@ -29,7 +28,7 @@ interface CartContextType {
   addItem: (item: Omit<CartItem, "cartItemId" | "quantity">) => void;
   removeItem: (cartItemId: string) => void;
   updateQuantity: (cartItemId: string, quantity: number) => void;
-  updateCustomFieldResponse: (cartItemId: string, fieldId: string, value: string) => void;
+  updateCustomFieldResponse: (cartItemId: string, label: string, value: string) => void;
   clearCart: () => void;
   totalItems: number;
   totalPrice: number;
@@ -153,11 +152,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
   };
 
-  const updateCustomFieldResponse = (cartItemId: string, fieldId: string, value: string) => {
+  const updateCustomFieldResponse = (cartItemId: string, label: string, value: string) => {
     setItems((prev) =>
       prev.map((i) =>
         i.cartItemId === cartItemId
-          ? { ...i, customFieldResponses: { ...i.customFieldResponses, [fieldId]: value } }
+          ? { ...i, customFieldResponses: { ...i.customFieldResponses, [label]: value } }
           : i
       )
     );

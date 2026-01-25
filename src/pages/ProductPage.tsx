@@ -75,7 +75,7 @@ export function ProductPage() {
     if (selectedVariant.customFields && selectedVariant.customFields.length > 0) {
       const allRequiredFieldsFilled = selectedVariant.customFields.every((field) => {
         if (!field.required) return true;
-        return customFieldResponses[field.fieldId]?.trim();
+        return customFieldResponses[field.label]?.trim();
       });
       if (!allRequiredFieldsFilled) return false;
     }
@@ -311,8 +311,8 @@ export function ProductPage() {
               <CustomFieldsEditor
                 fields={selectedVariant.customFields}
                 responses={customFieldResponses}
-                onResponseChange={(fieldId, value) =>
-                  setCustomFieldResponses((prev) => ({ ...prev, [fieldId]: value }))
+                onResponseChange={(label, value) =>
+                  setCustomFieldResponses((prev) => ({ ...prev, [label]: value }))
                 }
                 showValidation={showFieldValidation}
               />

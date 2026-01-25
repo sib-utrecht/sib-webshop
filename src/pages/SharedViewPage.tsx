@@ -113,8 +113,8 @@ export function SharedViewPage() {
   // Helper to get cell value
   const getCellValue = (row: OrderItemRow, columnId: string): React.ReactNode => {
     if (columnId.startsWith("customField_")) {
-      const fieldId = columnId.substring("customField_".length);
-      return row.customFieldResponses?.[fieldId] || "-";
+      const label = columnId.substring("customField_".length);
+      return row.customFieldResponses?.[label] || "-";
     }
 
     switch (columnId) {

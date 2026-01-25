@@ -4,34 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Package, User, Mail, Calendar } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
-import { useMemo } from "react";
 
 export function OrdersPage() {
   const orders = useQuery(api.orders.list);
-  const products = useQuery(api.products.listAll);
-
-  // Create a lookup map for custom field labels
-  const customFieldLabels = useMemo(() => {
-    if (!products) return new Map();
-    
-    const map = new Map<string, Map<string, string>>(); // productId -> (fieldId -> label)
-    
-    products.forEach(product => {
-      product.variants.forEach(variant => {
-        if (variant.customFields) {
-          const fieldMap = new Map<string, string>();
-          variant.customFields.forEach(field => {
-            fieldMap.set(field.fieldId, field.label);
-          });
-          // Store by variant's custom fields signature since we don't store variant info in order
-          const key = `${product._id}-${variant.variantId}`;
-          map.set(key, fieldMap);
-        }
-      });
-    });
-    
-    return map;
-  }, [products]);
 
   if (orders === undefined) {
     return (
@@ -128,13 +103,11 @@ export function OrdersPage() {
                         {/* Custom Field Responses */}
                         {item.customFieldResponses && Object.keys(item.customFieldResponses).length > 0 && (
                           <div className="ml-4 mt-1 p-2 bg-muted/50 rounded text-xs space-y-1">
-                            {Object.entries(item.customFieldResponses).map(([fieldId, value]) => {
-                              // Look up the field label
-                              const fieldMap = customFieldLabels.get(`${item.productId}-${item.variantId}`);
-                              const label = fieldMap?.get(fieldId) || fieldId;
+                            {Object.entries(item.customFieldResponses).map(([label, value]) => {
+                              if (!value) return null;
                               
                               return (
-                                <div key={fieldId}>
+                                <div key={label}>
                                   <span className="font-medium">{label}:</span>{" "}
                                   <span className="text-muted-foreground">{value}</span>
                                 </div>

@@ -42,7 +42,6 @@ type Variant = {
   maxQuantity?: number;
   requiredAgreements?: string[];
   customFields?: Array<{
-    fieldId: string;
     label: string;
     type: "text" | "email" | "tel" | "textarea";
     required: boolean;
@@ -457,7 +456,6 @@ export function ProductEditorPage() {
       customFields: [
         ...currentFields,
         {
-          fieldId: `field_${Date.now()}`,
           label: "",
           type: "text" as const,
           required: false,
@@ -872,7 +870,7 @@ export function ProductEditorPage() {
                       {variant.customFields && variant.customFields.length > 0 && (
                         <div className="space-y-3 p-3 bg-muted/50 rounded-md">
                           {variant.customFields.map((field, fieldIndex) => (
-                            <div key={field.fieldId} className="space-y-2 p-3 bg-background rounded-md border">
+                            <div key={field.label || fieldIndex} className="space-y-2 p-3 bg-background rounded-md border">
                               <div className="grid grid-cols-2 gap-2">
                                 <div>
                                   <Label htmlFor={`field-label-${index}-${fieldIndex}`} className="text-xs">

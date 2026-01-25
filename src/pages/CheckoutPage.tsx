@@ -63,7 +63,7 @@ export function CheckoutPage() {
     if (!item.customFields) return true;
     return item.customFields.every((field) => {
       if (!field.required) return true;
-      return item.customFieldResponses && item.customFieldResponses[field.fieldId]?.trim();
+      return item.customFieldResponses && item.customFieldResponses[field.label]?.trim();
     });
   });
   const hasNonVirtualItems = items.some((item) => !item.isVirtual);
@@ -180,11 +180,11 @@ export function CheckoutPage() {
                 const hasCustomFields = item.customFields && item.customFields.length > 0;
                 const hasAgreements = item.requiredAgreements && item.requiredAgreements.length > 0;
                 const hasResponses = item.customFields?.some(
-                  (field) => item.customFieldResponses?.[field.fieldId]
+                  (field) => item.customFieldResponses?.[field.label]
                 );
                 const allRequiredFilled = item.customFields
                   ?.filter((field) => field.required)
-                  .every((field) => item.customFieldResponses?.[field.fieldId]);
+                  .every((field) => item.customFieldResponses?.[field.label]);
 
                 return (
                   <li key={item.cartItemId} className="border-b pb-4 last:border-0">
@@ -284,10 +284,10 @@ export function CheckoutPage() {
                         {hasResponses ? (
                           <div className="space-y-1">
                             {item.customFields?.map((field) => {
-                              const value = item.customFieldResponses?.[field.fieldId];
+                              const value = item.customFieldResponses?.[field.label];
                               if (value) {
                                 return (
-                                  <p key={field.fieldId} className="text-xs text-muted-foreground">
+                                  <p key={field.label} className="text-xs text-muted-foreground">
                                     <span className="font-medium">{field.label}:</span>{" "}
                                     {value.length > 50 ? value.slice(0, 50) + "..." : value}
                                   </p>
@@ -510,8 +510,8 @@ export function CheckoutPage() {
                 <CustomFieldsEditor
                   fields={editingItem.customFields}
                   responses={editingItem.customFieldResponses || {}}
-                  onResponseChange={(fieldId, value) =>
-                    updateCustomFieldResponse(editingItem.cartItemId, fieldId, value)
+                  onResponseChange={(label, value) =>
+                    updateCustomFieldResponse(editingItem.cartItemId, label, value)
                   }
                   showValidation={true}
                 />

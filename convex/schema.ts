@@ -22,7 +22,7 @@ export default defineSchema({
         requiredAgreements: v.optional(v.array(v.string())),
         customFields: v.optional(v.array(
           v.object({
-            fieldId: v.string(),
+            fieldId: v.optional(v.string()),
             label: v.string(),
             type: v.union(v.literal("text"), v.literal("email"), v.literal("tel"), v.literal("textarea")),
             required: v.boolean(),
@@ -42,7 +42,7 @@ export default defineSchema({
     requiredAgreements: v.optional(v.array(v.string())),
     customFields: v.optional(v.array(
       v.object({
-        fieldId: v.string(),
+        fieldId: v.optional(v.string()),
         label: v.string(),
         type: v.union(v.literal("text"), v.literal("email"), v.literal("tel"), v.literal("textarea")),
         required: v.boolean(),
@@ -101,7 +101,7 @@ export default defineSchema({
 
   views: defineTable({
     name: v.string(),
-    columns: v.array(v.string()), // Column IDs to display (e.g., ["email", "productName", "variantName", "customField_fieldId"])
+    columns: v.array(v.string()), // Column IDs to display (e.g., ["email", "productName", "variantName", "customField_<label>"])
     filters: v.optional(v.object({
       variantIds: v.optional(v.array(v.id("variants"))), // Variant database IDs
       statuses: v.optional(v.array(v.string())),

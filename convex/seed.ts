@@ -33,7 +33,6 @@ const mockProducts = [
         requiredAgreements: [codeOfConductAgreementPlusOne],
         customFields: [
           {
-            fieldId: "name",
             label: "Full name",
             type: "text",
             required: true,
