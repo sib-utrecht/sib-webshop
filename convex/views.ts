@@ -1,7 +1,6 @@
 import { query, mutation, internalQuery } from "./_generated/server";
-import { v } from "convex/values";
+import { Infer, v } from "convex/values";
 import { requireAdmin } from "./auth";
-import { Doc } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 
 // Generate a secure random token for sharing
@@ -266,7 +265,7 @@ export const executeViewInternal = internalQuery({
 export const execute = query({
   args: { viewId: v.id("views") },
   returns: v.array(orderItemRowValidator),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<Array<Infer<typeof orderItemRowValidator>>> => {
     await requireAdmin(ctx);
     
     const view = await ctx.db.get(args.viewId);
@@ -342,7 +341,7 @@ export const getByShareToken = query({
 export const executeByShareToken = query({
   args: { shareToken: v.string() },
   returns: v.array(orderItemRowValidator),
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<Array<Infer<typeof orderItemRowValidator>>> => {
     // No authentication required - this is a public endpoint
     const view = await ctx.db
       .query("views")

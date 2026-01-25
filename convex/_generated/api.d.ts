@@ -18,6 +18,7 @@ import type * as products from "../products.js";
 import type * as seed from "../seed.js";
 import type * as stock from "../stock.js";
 import type * as views from "../views.js";
+import type * as viewsInternal from "../viewsInternal.js";
 
 import type {
   ApiFromModules,
@@ -36,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   seed: typeof seed;
   stock: typeof stock;
   views: typeof views;
+  viewsInternal: typeof viewsInternal;
 }>;
 
 /**
