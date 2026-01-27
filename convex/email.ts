@@ -24,7 +24,7 @@ const getSESClient = () => {
 };
 
 const FROM_EMAIL = "webshop@sib-utrecht.nl";
-const CUSTOMER_SERVICE_EMAIL = "ict@sib-utrecht.nl";
+const CUSTOMER_SERVICE_EMAIL = "info@sib-utrecht.nl";
 
 /**
  * Format order items as HTML table
