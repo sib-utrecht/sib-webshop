@@ -349,7 +349,7 @@ export function ProductPage() {
                   size="lg"
                   variant="outline"
                   asChild
-                  className="flex-1"
+                  className="w-full sm:flex-1 min-h-10"
                 >
                   <Link to="/checkout">
                     Go to Cart
@@ -361,7 +361,7 @@ export function ProductPage() {
                 size="lg"
                 onClick={handleAddToCart}
                 disabled={!canAddToCart()}
-                className="flex-1"
+                className="w-full sm:flex-1 min-h-10"
               >
                 {justAdded ? (
                   <>
