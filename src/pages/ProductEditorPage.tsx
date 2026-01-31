@@ -50,6 +50,7 @@ type Variant = {
   stock?: number;
   secondaryStockVariantId?: string; // Reference to another variant by variantId
   secondaryStockFactor?: number; // How many units of secondary stock to decrement (default 1)
+  hideStockIfAbove: number; // Hide stock level if above this number (required)
 };
 
 type ProductForm = {
@@ -73,7 +74,7 @@ const emptyProduct: ProductForm = {
   imageUrl: "",
   gallery: [],
   isVirtual: false,
-  variants: [{ variantId: "default", name: "Default", price: 0 }],
+  variants: [{ variantId: "default", name: "Default", price: 0, hideStockIfAbove: 1000 }],
 };
 
 type SortableProductProps = {
@@ -268,6 +269,7 @@ export function ProductEditorPage() {
           ? variantDbIdToVariantId.get(v.secondaryStock)
           : undefined,
         secondaryStockFactor: v.secondaryStockFactor,
+        hideStockIfAbove: v.hideStockIfAbove ?? 1000,
       })),
     });
     setError("");
@@ -305,6 +307,10 @@ export function ProductEditorPage() {
       }
       if (variant.price < 0) {
         setError("Variant prices must be non-negative");
+        return;
+      }
+      if (variant.hideStockIfAbove == null || variant.hideStockIfAbove < 0) {
+        setError("All variants must have a valid 'Hide Stock If Above' value (0 or greater)");
         return;
       }
     }
@@ -410,7 +416,7 @@ export function ProductEditorPage() {
       ...editingProduct,
       variants: [
         ...editingProduct.variants,
-        { variantId: "", name: "", price: 0 },
+        { variantId: "", name: "", price: 0, hideStockIfAbove: 1000 },
       ],
     });
   };
@@ -852,6 +858,38 @@ export function ProductEditorPage() {
                         </p>
                       </div>
                     )}
+
+                    <div>
+                      <Label htmlFor={`variantHideStockIfAbove-${index}`}>
+                        Hide Stock If Above *
+                      </Label>
+                      <Input
+                        id={`variantHideStockIfAbove-${index}`}
+                        type="number"
+                        min="0"
+                        step="1"
+                        required
+                        value={variant.hideStockIfAbove}
+                        onChange={(e) =>
+                          updateVariant(
+                            index,
+                            "hideStockIfAbove",
+                            parseInt(e.target.value)
+                          )
+                        }
+                        onBlur={(e) => {
+                          // Apply default value of 1000 if field is empty or invalid
+                          const value = parseInt(e.target.value);
+                          if (!value || isNaN(value)) {
+                            updateVariant(index, "hideStockIfAbove", 1000);
+                          }
+                        }}
+                        placeholder="1000"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Hide the stock count on the product page if stock is above this number.
+                      </p>
+                    </div>
 
                     {/* Custom Fields Section */}
                     <div className="mt-4 space-y-3">

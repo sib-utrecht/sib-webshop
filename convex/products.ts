@@ -25,6 +25,7 @@ const variantValidator = v.object({
   available: v.number(),
   secondaryStock: v.optional(v.id("variants")),
   secondaryStockFactor: v.optional(v.number()),
+  hideStockIfAbove: v.optional(v.number()),
 });
 
 const productValidator = v.object({
@@ -69,6 +70,7 @@ async function loadProductVariants(ctx: QueryCtx, productId: Id<"products">) {
       available,
       secondaryStock: v.secondaryStock,
       secondaryStockFactor: v.secondaryStockFactor,
+      hideStockIfAbove: v.hideStockIfAbove,
     });
   }
   
@@ -263,6 +265,7 @@ export const update = mutation({
         )),
         secondaryStockVariantId: v.optional(v.string()),
         secondaryStockFactor: v.optional(v.number()),
+        hideStockIfAbove: v.optional(v.number()),
       })
     ),
   },
@@ -326,6 +329,7 @@ export const update = mutation({
           maxQuantity: variant.maxQuantity,
           requiredAgreements: variant.requiredAgreements,
           customFields: variant.customFields,
+          hideStockIfAbove: variant.hideStockIfAbove,
         });
       } else {
         // Insert new variant with initial stock
@@ -339,6 +343,7 @@ export const update = mutation({
           customFields: variant.customFields,
           quantity: 0,
           reserved: 0,
+          hideStockIfAbove: variant.hideStockIfAbove,
         });
       }
     }

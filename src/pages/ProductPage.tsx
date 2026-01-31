@@ -271,9 +271,12 @@ export function ProductPage() {
                   </p>
                 )}
                 {selectedVariant.available > 0 && selectedVariant.available < 999999 && (
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {selectedVariant.available} in stock
-                  </p>
+                  // Only show stock count if hideStockIfAbove is not set or stock is below the threshold
+                  (!selectedVariant.hideStockIfAbove || selectedVariant.available <= selectedVariant.hideStockIfAbove) && (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {selectedVariant.available} in stock
+                    </p>
+                  )
                 )}
                 {selectedVariant.available <= 0 && (
                   <p className="mt-1 text-sm text-destructive font-semibold">
