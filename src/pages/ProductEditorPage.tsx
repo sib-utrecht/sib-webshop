@@ -600,7 +600,7 @@ export function ProductEditorPage() {
             </div>
 
             <div>
-              <Label htmlFor="shortDescription">Short Description</Label>
+              <Label htmlFor="shortDescription">Caption in product list (optional)</Label>
               <Input
                 id="shortDescription"
                 value={editingProduct.shortDescription || ""}
@@ -610,7 +610,7 @@ export function ProductEditorPage() {
                     shortDescription: e.target.value,
                   })
                 }
-                placeholder="Brief one-line description"
+                placeholder="(None)"
               />
             </div>
 
@@ -625,7 +625,7 @@ export function ProductEditorPage() {
                     description: e.target.value,
                   })
                 }
-                placeholder="Full product description (supports Markdown)"
+                placeholder="Product description (supports Markdown)"
                 rows={4}
               />
             </div>
@@ -690,7 +690,7 @@ export function ProductEditorPage() {
                 }
                 className="h-4 w-4 cursor-pointer"
               />
-              <Label htmlFor="isVirtual">Virtual Product (no shipping)</Label>
+              <Label htmlFor="isVirtual">Item does not need to be picked up (e.g. tickets)</Label>
             </div>
 
             <div>

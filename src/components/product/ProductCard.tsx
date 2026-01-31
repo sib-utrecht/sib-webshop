@@ -7,7 +7,6 @@ interface ProductCardProps {
   id: Id<"products">;
   productId: string;
   name: string;
-  description: string | null;
   shortDescription?: string;
   imageUrl: string;
   variants: Array<{
@@ -22,7 +21,6 @@ export function ProductCard({
   id: _id,
   productId,
   name,
-  description,
   shortDescription,
   imageUrl,
   variants,
@@ -50,7 +48,7 @@ export function ProductCard({
             <h3 className="font-semibold line-clamp-1">{name}</h3>
           </div>
           <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
-            {shortDescription || description || ""}
+            {shortDescription}
           </p>
           <p className="mt-3 text-lg font-bold">{priceDisplay}</p>
           {variants.length > 1 && (

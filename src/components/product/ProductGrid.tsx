@@ -40,7 +40,6 @@ export function ProductGrid({ products }: ProductGridProps) {
           id={product._id}
           productId={product.productId}
           name={product.name}
-          description={product.description}
           shortDescription={product.shortDescription}
           imageUrl={product.imageUrl}
           variants={product.variants}
