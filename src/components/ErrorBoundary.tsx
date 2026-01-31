@@ -64,7 +64,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Go Back
               </Button>
-              <Button onClick={this.reset}>
+              <Button onClick={() => window.location.reload()}>
                 Try Again
               </Button>
             </div>
