@@ -13,9 +13,14 @@ function ConvexAuthWrapper({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
   
   // Update Convex client with auth token whenever it changes
+  // Use a function that reads from localStorage to always get the latest token
   useEffect(() => {
     if (token) {
-      convex.setAuth(async () => token);
+      convex.setAuth(async () => {
+        // Always get the freshest token from localStorage
+        const latestToken = localStorage.getItem('cognito_jwt_token');
+        return latestToken || token;
+      });
     } else {
       convex.clearAuth();
     }

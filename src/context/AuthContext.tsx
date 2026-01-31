@@ -123,12 +123,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      console.log('[Auth] Refreshing token...');
+      
       // For password-based auth, use Cognito SDK
       const cognitoUser = userPool.getCurrentUser();
       if (cognitoUser) {
         return new Promise((resolve) => {
           cognitoUser.getSession((err: Error | null, session: CognitoUserSession | null) => {
             if (err || !session || !session.isValid()) {
+              console.error('[Auth] Failed to refresh via Cognito session:', err);
               clearToken();
               resolve(false);
               return;
@@ -136,18 +139,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             
             const jwtToken = session.getIdToken().getJwtToken();
             if (isAdminUser(jwtToken)) {
-              setToken(jwtToken);
-              localStorage.setItem(TOKEN_STORAGE_KEY, jwtToken);
-              
-              // Update expiry
-              try {
-                const payload = JSON.parse(atob(jwtToken.split('.')[1]));
-                const expiryTime = payload.exp * 1000;
-                localStorage.setItem(TOKEN_EXPIRY_STORAGE_KEY, expiryTime.toString());
-              } catch (error) {
-                console.error('Failed to parse token expiry:', error);
-              }
-              
+              console.log('[Auth] Token refreshed successfully via Cognito session');
+              // Use saveToken instead of manually setting to ensure all state is updated
+              const refreshTokenStr = session.getRefreshToken().getToken();
+              saveToken(jwtToken, refreshTokenStr, username);
               resolve(true);
             } else {
               clearToken();
@@ -172,6 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const jwtToken = response.AuthenticationResult.IdToken;
         
         if (isAdminUser(jwtToken)) {
+          console.log('[Auth] Token refreshed successfully via AWS SDK');
           // Keep the same refresh token and username
           saveToken(
             jwtToken,
@@ -182,10 +178,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
       
+      console.error('[Auth] Token refresh failed: Invalid response or not admin');
       clearToken();
       return false;
     } catch (error) {
-      console.error('Failed to refresh token:', error);
+      console.error('[Auth] Failed to refresh token:', error);
       clearToken();
       return false;
     }
@@ -250,12 +247,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const checkAndRefresh = async () => {
       if (needsRefresh()) {
-        await refreshAccessToken();
+        console.log('[Auth] Token needs refresh, refreshing now...');
+        const success = await refreshAccessToken();
+        if (!success) {
+          console.error('[Auth] Token refresh failed, logging out');
+          logout();
+        }
       }
     };
 
     // Check every minute
     const interval = setInterval(checkAndRefresh, 60 * 1000);
+
+    // Also check immediately on mount
+    checkAndRefresh();
+
 
     return () => clearInterval(interval);
   }, [isAuthenticated]);
