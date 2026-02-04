@@ -47,6 +47,13 @@ export const createOrder = internalMutation({
   },
   returns: createOrderReturnValidator,
   handler: async (ctx, args): Promise<Infer<typeof createOrderReturnValidator>> => {
+    if (args.items.length === 0) {
+      return {
+        success: false,
+        message: "No items in the order",
+      };
+    }
+
     // Validate quantities are positive integers
     for (const item of args.items) {
       const quantity = Math.floor(Math.abs(item.quantity));
@@ -274,7 +281,31 @@ export const processCheckout = action({
       };
     }
 
-    // Step 2: Create payment
+    // Step 2: Handle zero-euro orders (bypass payment)
+    if (orderResult.totalAmount === 0) {
+      // Mark order as paid immediately and confirm stock
+      await ctx.runMutation(internal.checkout.confirmPaid, {
+        orderDbId: orderResult.orderDbId,
+      });
+
+      // Schedule new order notification email
+      await ctx.scheduler.runAfter(0, internal.checkout.sendNewOrderNotification, {
+        orderDbId: orderResult.orderDbId,
+      });
+
+      // Get the site URL from environment
+      const baseUrl = process.env.VITE_APP_URL || "https://shop.sib-utrecht.nl";
+      const checkoutUrl = `${baseUrl}/checkout/success?orderId=${orderResult.orderId}&id=${orderResult.orderDbId}`;
+
+      return {
+        success: true,
+        checkoutUrl,
+        message: "Order completed successfully (no payment required)",
+        orderId: orderResult.orderId,
+      };
+    }
+
+    // Step 3: Create payment for non-zero orders
     const paymentResult = await ctx.runAction(internal.orders.createPaymentForOrder, {
       orderDbId: orderResult.orderDbId,
     });
@@ -287,7 +318,7 @@ export const processCheckout = action({
       };
     }
 
-    // Step 3: Schedule new order notification email to webshop maintainer
+    // Step 4: Schedule new order notification email to webshop maintainer
     // Using scheduler ensures the email will be sent even if this action completes quickly
     await ctx.scheduler.runAfter(0, internal.checkout.sendNewOrderNotification, {
       orderDbId: orderResult.orderDbId,
@@ -299,6 +330,55 @@ export const processCheckout = action({
       message: "Checkout processed successfully",
       orderId: orderResult.orderId,
     };
+  },
+});
+
+/**
+ * Confirm an order as paid: confirm stock purchases and send confirmation emails
+ * (called for zero-euro orders or from updateOrderStatus for paid webhooks)
+ */
+export const confirmPaid = internalMutation({
+  args: {
+    orderDbId: v.id("orders"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const order = await ctx.db.get(args.orderDbId);
+
+    if (!order) {
+      console.error(`Order not found for orderDbId: ${args.orderDbId}`);
+      return null;
+    }
+
+    // Update order status to paid
+    await ctx.db.patch(args.orderDbId, {
+      paymentStatus: "paid",
+      status: "paid",
+    });
+
+    // Payment successful: confirm purchase (decrement quantity and release reservation)
+    for (const item of order.items) {
+      const product = await ctx.db.get(item.productId);
+      
+      // Skip stock operations for donation products
+      if (product?.productId === "donation") {
+        continue;
+      }
+
+      await ctx.runMutation(internal.stock.confirmPurchase, {
+        productId: item.productId,
+        variantId: item.variantId,
+        quantity: item.quantity,
+      });
+    }
+
+    // Send payment confirmation emails (customer + maintainer)
+    // Note: We schedule these to run asynchronously
+    await ctx.scheduler.runAfter(0, internal.checkout.sendPaymentConfirmationEmails, {
+      orderDbId: args.orderDbId,
+    });
+
+    return null;
   },
 });
 
@@ -369,25 +449,8 @@ export const updateOrderStatus = internalMutation({
 
     // Handle stock based on payment status (only if status changed)
     if (status === "paid") {
-      // Payment successful: confirm purchase (decrement quantity and release reservation)
-      for (const item of order.items) {
-        const product = await ctx.db.get(item.productId);
-        
-        // Skip stock operations for donation products
-        if (product?.productId === "donation") {
-          continue;
-        }
-
-        await ctx.runMutation(internal.stock.confirmPurchase, {
-          productId: item.productId,
-          variantId: item.variantId,
-          quantity: item.quantity,
-        });
-      }
-
-      // Send payment confirmation emails (customer + maintainer)
-      // Note: We schedule these to run asynchronously
-      await ctx.scheduler.runAfter(0, internal.checkout.sendPaymentConfirmationEmails, {
+      // Call confirmPaid to handle stock confirmation and send emails
+      await ctx.runMutation(internal.checkout.confirmPaid, {
         orderDbId: order._id,
       });
     } else if (status === "expired" || status === "failed" || status === "canceled") {

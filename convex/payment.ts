@@ -41,7 +41,7 @@ export const generatePaymentUrl = internalAction({
       const mollieClient = createMollieClient({ apiKey });
 
       // Get the base URL from environment or use default
-      const baseUrl = process.env.VITE_APP_URL || "http://localhost:5173";
+      const baseUrl = process.env.VITE_APP_URL || "https://shop.sib-utrecht.nl";
       const webhookUrl = process.env.CONVEX_SITE_URL 
         ? `${process.env.CONVEX_SITE_URL}/payment-webhook?orderId=${encodeURIComponent(args.orderId)}`
         : undefined;
