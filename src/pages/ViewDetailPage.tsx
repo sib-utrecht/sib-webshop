@@ -99,6 +99,7 @@ export function ViewDetailPage() {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [name, setName] = useState("");
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<Id<"products">[]>([]);
   const [selectedVariantIds, setSelectedVariantIds] = useState<Id<"variants">[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("");
@@ -112,6 +113,7 @@ export function ViewDetailPage() {
     if (view && view !== null) {
       setName(view.name);
       setSelectedColumns(view.columns);
+      setSelectedProductIds(view.filters?.productIds || []);
       setSelectedVariantIds(view.filters?.variantIds || []);
       setSelectedStatuses(view.filters?.statuses || []);
       setSortBy(view.sortBy || "");
@@ -139,6 +141,7 @@ export function ViewDetailPage() {
         name: view.name,
         columns: newColumns,
         filters: {
+          productIds: selectedProductIds.length > 0 ? selectedProductIds : undefined,
           variantIds: selectedVariantIds.length > 0 ? selectedVariantIds : undefined,
           statuses: selectedStatuses.length > 0 ? selectedStatuses : undefined,
         },
@@ -163,6 +166,7 @@ export function ViewDetailPage() {
     
     await updateViewConfig({
       filters: {
+        productIds: selectedProductIds.length > 0 ? selectedProductIds : undefined,
         variantIds: newVariantIds.length > 0 ? newVariantIds : undefined,
         statuses: selectedStatuses.length > 0 ? selectedStatuses : undefined,
       },
@@ -178,6 +182,7 @@ export function ViewDetailPage() {
     
     await updateViewConfig({
       filters: {
+        productIds: selectedProductIds.length > 0 ? selectedProductIds : undefined,
         variantIds: newVariantIds.length > 0 ? newVariantIds : undefined,
         statuses: selectedStatuses.length > 0 ? selectedStatuses : undefined,
       },
@@ -193,6 +198,7 @@ export function ViewDetailPage() {
     
     await updateViewConfig({
       filters: {
+        productIds: selectedProductIds.length > 0 ? selectedProductIds : undefined,
         variantIds: selectedVariantIds.length > 0 ? selectedVariantIds : undefined,
         statuses: newStatuses.length > 0 ? newStatuses : undefined,
       },
@@ -201,7 +207,7 @@ export function ViewDetailPage() {
 
   const updateViewConfig = async (updates: Partial<{
     columns: string[];
-    filters: { variantIds?: Id<"variants">[]; statuses?: string[] };
+    filters: { productIds?: Id<"products">[]; variantIds?: Id<"variants">[]; statuses?: string[] };
     sortBy?: string;
     sortOrder?: "asc" | "desc";
   }>) => {
@@ -212,6 +218,7 @@ export function ViewDetailPage() {
       name: view.name,
       columns: updates.columns ?? selectedColumns,
       filters: updates.filters ?? {
+        productIds: selectedProductIds.length > 0 ? selectedProductIds : undefined,
         variantIds: selectedVariantIds.length > 0 ? selectedVariantIds : undefined,
         statuses: selectedStatuses.length > 0 ? selectedStatuses : undefined,
       },
