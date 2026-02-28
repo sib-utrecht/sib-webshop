@@ -3,7 +3,7 @@
 import { internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { createMollieClient } from "@mollie/api-client";
-import { PaymentLine } from "@mollie/api-client/dist/types/data/payments/data";
+import type { PaymentLine } from "@mollie/api-client/dist/types/data/payments/data";
 
 /**
  * Create a Mollie payment for an order
