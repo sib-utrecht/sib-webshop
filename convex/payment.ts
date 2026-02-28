@@ -59,7 +59,7 @@ export const generatePaymentUrl = internalAction({
 
       // Build order lines from items
       const lines = args.items?.map(item => ({
-        description: `${item.productName} – ${item.variantName}`,
+        description: `${item.productName} - ${item.variantName}`,
         quantity: item.quantity,
         unitPrice: {
           currency: "EUR" as const,
