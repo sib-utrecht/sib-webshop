@@ -3,6 +3,7 @@
 import { internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { createMollieClient } from "@mollie/api-client";
+import { PaymentLine } from "@mollie/api-client/dist/types/data/payments/data";
 
 /**
  * Create a Mollie payment for an order
@@ -58,9 +59,10 @@ export const generatePaymentUrl = internalAction({
       console.log("Base url:", baseUrl);
 
       // Build order lines from items
-      const lines = args.items?.map(item => ({
+      const lines = args.items?.map<PaymentLine>(item => ({
         description: `${item.productName} - ${item.variantName}`,
         quantity: item.quantity,
+        sku: `${item.productName}_${item.variantName}`,
         unitPrice: {
           currency: "EUR" as const,
           value: item.price.toFixed(2),
