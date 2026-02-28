@@ -16,6 +16,7 @@ function getRandomToken(): string {
 
 // Validator for view filters
 const viewFiltersValidator = v.optional(v.object({
+  productIds: v.optional(v.array(v.id("products"))),
   variantIds: v.optional(v.array(v.id("variants"))),
   statuses: v.optional(v.array(v.string())),
 }));
@@ -194,8 +195,16 @@ export const executeViewInternal = internalQuery({
       }))
     );
     
-    // Apply variant filter using variant database IDs
+    // Apply product filter using product database IDs
     let filteredRows = rows;
+    if (view.filters?.productIds && view.filters.productIds.length > 0) {
+      const productIdSet = new Set(view.filters.productIds.map((id: any) => id.toString()));
+      filteredRows = filteredRows.filter(row => 
+        productIdSet.has(row.productId.toString())
+      );
+    }
+    
+    // Apply variant filter using variant database IDs
     if (view.filters?.variantIds && view.filters.variantIds.length > 0) {
       // Create a map of variant DB ids to their productId-variantId for quick lookup
       const variantMap = new Map<string, boolean>();

@@ -84,6 +84,7 @@ export default defineSchema({
     name: v.string(),
     columns: v.array(v.string()), // Column IDs to display (e.g., ["email", "productName", "variantName", "customField_<label>"])
     filters: v.optional(v.object({
+      productIds: v.optional(v.array(v.id("products"))), // Product database IDs
       variantIds: v.optional(v.array(v.id("variants"))), // Variant database IDs
       statuses: v.optional(v.array(v.string())),
     })),
