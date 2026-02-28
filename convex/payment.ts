@@ -14,6 +14,12 @@ export const generatePaymentUrl = internalAction({
     name: v.string(),
     email: v.string(),
     totalAmount: v.number(),
+    items: v.optional(v.array(v.object({
+      productName: v.string(),
+      variantName: v.string(),
+      quantity: v.number(),
+      price: v.number(),
+    }))),
   },
   returns: v.object({
     success: v.boolean(),
@@ -51,6 +57,20 @@ export const generatePaymentUrl = internalAction({
       console.log("Creating Mollie payment with webhook URL:", webhookUrl);
       console.log("Base url:", baseUrl);
 
+      // Build order lines from items
+      const lines = args.items?.map(item => ({
+        description: `${item.productName} – ${item.variantName}`,
+        quantity: item.quantity,
+        unitPrice: {
+          currency: "EUR" as const,
+          value: item.price.toFixed(2),
+        },
+        totalAmount: {
+          currency: "EUR" as const,
+          value: (item.price * item.quantity).toFixed(2),
+        },
+      }));
+
       // Create payment with Mollie
       const payment = await mollieClient.payments.create({
         amount: {
@@ -60,6 +80,7 @@ export const generatePaymentUrl = internalAction({
         description: `Order ${args.orderId} - SIB Webshop${isTestPayment ? " (TEST)" : ""}`,
         redirectUrl: `${baseUrl}/checkout/success?orderId=${args.orderId}&id=${args.orderDbId}`,
         webhookUrl,
+        lines: lines?.length ? lines : undefined,
         metadata: {
           orderId: args.orderId,
         },

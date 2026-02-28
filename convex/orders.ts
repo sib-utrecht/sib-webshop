@@ -36,6 +36,7 @@ export const createPaymentForOrder = internalAction({
       name: order.name,
       email: order.email,
       totalAmount: order.totalAmount,
+      items: order.items,
     });
 
     if (!paymentResult.success || !paymentResult.paymentId || !paymentResult.checkoutUrl) {
@@ -72,6 +73,12 @@ export const getOrderById = internalQuery({
       name: v.string(),
       email: v.string(),
       totalAmount: v.number(),
+      items: v.array(v.object({
+        productName: v.string(),
+        variantName: v.string(),
+        quantity: v.number(),
+        price: v.number(),
+      })),
     }),
     v.null()
   ),
@@ -88,6 +95,12 @@ export const getOrderById = internalQuery({
       name: order.name,
       email: order.email,
       totalAmount: order.totalAmount,
+      items: order.items.map(item => ({
+        productName: item.productName,
+        variantName: item.variantName,
+        quantity: item.quantity,
+        price: item.price,
+      })),
     };
   },
 });
