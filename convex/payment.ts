@@ -62,7 +62,6 @@ export const generatePaymentUrl = internalAction({
       const lines = args.items?.map<PaymentLine>(item => ({
         description: `${item.productName} - ${item.variantName}`,
         quantity: item.quantity,
-        sku: `${item.productName}_${item.variantName}`,
         unitPrice: {
           currency: "EUR" as const,
           value: item.price.toFixed(2),
