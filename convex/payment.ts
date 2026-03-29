@@ -60,7 +60,7 @@ export const generatePaymentUrl = internalAction({
 
       // Build order lines from items
       const lines = args.items?.map<PaymentLine>(item => ({
-        description: `${item.productName} - ${item.variantName}`,
+        description: `${item.productName} – ${item.variantName}`,
         quantity: item.quantity,
         unitPrice: {
           currency: "EUR" as const,
@@ -71,6 +71,8 @@ export const generatePaymentUrl = internalAction({
           value: (item.price * item.quantity).toFixed(2),
         },
       }));
+
+      console.log("Payment lines:", JSON.stringify(lines));
 
       // Create payment with Mollie
       const payment = await mollieClient.payments.create({
