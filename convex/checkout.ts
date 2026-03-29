@@ -320,9 +320,9 @@ export const processCheckout = action({
 
     // Step 4: Schedule new order notification email to webshop maintainer
     // Using scheduler ensures the email will be sent even if this action completes quickly
-    await ctx.scheduler.runAfter(0, internal.checkout.sendNewOrderNotification, {
-      orderDbId: orderResult.orderDbId,
-    });
+    // await ctx.scheduler.runAfter(0, internal.checkout.sendNewOrderNotification, {
+    //   orderDbId: orderResult.orderDbId,
+    // });
 
     return {
       success: true,
