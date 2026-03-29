@@ -36,6 +36,7 @@ const productValidator = v.object({
   description: v.union(v.string(), v.null()),
   shortDescription: v.optional(v.string()),
   imageUrl: v.string(),
+  imageStorageId: v.optional(v.id("_storage")),
   gallery: v.array(v.string()),
   isVirtual: v.boolean(),
   isVisible: v.optional(v.boolean()),
@@ -85,11 +86,36 @@ const productWithStockValidator = v.object({
   description: v.union(v.string(), v.null()),
   shortDescription: v.optional(v.string()),
   imageUrl: v.string(),
+  imageStorageId: v.optional(v.id("_storage")),
   gallery: v.array(v.string()),
   isVirtual: v.boolean(),
   isVisible: v.optional(v.boolean()),
   sortOrder: v.optional(v.number()),
   variants: v.array(variantValidator),
+});
+
+async function resolveProductImageUrl(
+  ctx: QueryCtx,
+  product: {
+    imageUrl: string;
+    imageStorageId?: Id<"_storage">;
+  }
+) {
+  if (!product.imageStorageId) {
+    return product.imageUrl;
+  }
+
+  const storageUrl = await ctx.storage.getUrl(product.imageStorageId);
+  return storageUrl ?? product.imageUrl;
+}
+
+export const generateUploadUrl = mutation({
+  args: {},
+  returns: v.string(),
+  handler: async (ctx) => {
+    await requireAdmin(ctx);
+    return await ctx.storage.generateUploadUrl();
+  },
 });
 
 export const list = query({
@@ -111,10 +137,12 @@ export const list = query({
     // Fetch variants (with stock) for all products
     const productsWithStock = await Promise.all(
       visibleProducts.map(async (product) => {
+        const imageUrl = await resolveProductImageUrl(ctx, product);
         const variants = await loadProductVariants(ctx, product._id);
 
         return {
           ...product,
+          imageUrl,
           variants,
         };
       })
@@ -131,10 +159,12 @@ export const getById = query({
     const product = await ctx.db.get(args.id);
     if (!product) return null;
     
+    const imageUrl = await resolveProductImageUrl(ctx, product);
     const variants = await loadProductVariants(ctx, product._id);
     
     return {
       ...product,
+      imageUrl,
       variants,
     };
   },
@@ -154,10 +184,12 @@ export const getByProductId = query({
       return null;
     }
     
+    const imageUrl = await resolveProductImageUrl(ctx, product);
     const variants = await loadProductVariants(ctx, product._id);
     
     return {
       ...product,
+      imageUrl,
       variants,
     };
   },
@@ -170,6 +202,7 @@ export const create = mutation({
     description: v.union(v.string(), v.null()),
     shortDescription: v.optional(v.string()),
     imageUrl: v.string(),
+    imageStorageId: v.optional(v.id("_storage")),
     gallery: v.array(v.string()),
     isVirtual: v.boolean(),
     isVisible: v.optional(v.boolean()),
@@ -198,6 +231,10 @@ export const create = mutation({
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
 
+    if (!args.imageUrl.trim() && !args.imageStorageId) {
+      throw new Error("Either imageUrl or imageStorageId is required");
+    }
+
     // Check if productId already exists
     const existing = await ctx.db
       .query("products")
@@ -214,6 +251,7 @@ export const create = mutation({
       description: args.description,
       shortDescription: args.shortDescription,
       imageUrl: args.imageUrl,
+      imageStorageId: args.imageStorageId,
       gallery: args.gallery,
       isVirtual: args.isVirtual,
       isVisible: args.isVisible ?? true,
@@ -276,6 +314,7 @@ export const update = mutation({
     description: v.union(v.string(), v.null()),
     shortDescription: v.optional(v.string()),
     imageUrl: v.string(),
+    imageStorageId: v.optional(v.id("_storage")),
     gallery: v.array(v.string()),
     isVirtual: v.boolean(),
     isVisible: v.optional(v.boolean()),
@@ -304,6 +343,10 @@ export const update = mutation({
   handler: async (ctx, args) => {
     await requireAdmin(ctx);
 
+    if (!args.imageUrl.trim() && !args.imageStorageId) {
+      throw new Error("Either imageUrl or imageStorageId is required");
+    }
+
     const product = await ctx.db.get(args.id);
     if (!product) {
       throw new Error("Product not found");
@@ -328,6 +371,7 @@ export const update = mutation({
       description: args.description,
       shortDescription: args.shortDescription,
       imageUrl: args.imageUrl,
+      imageStorageId: args.imageStorageId,
       gallery: args.gallery,
       isVirtual: args.isVirtual,
       isVisible: args.isVisible,
@@ -478,10 +522,12 @@ export const listAll = query({
     // Fetch variants (with stock) for all products
     const productsWithStock = await Promise.all(
       products.map(async (product) => {
+        const imageUrl = await resolveProductImageUrl(ctx, product);
         const variants = await loadProductVariants(ctx, product._id);
 
         return {
           ...product,
+          imageUrl,
           variants,
         };
       })

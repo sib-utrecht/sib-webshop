@@ -8,6 +8,7 @@ export default defineSchema({
     description: v.union(v.string(), v.null()),
     shortDescription: v.optional(v.string()),
     imageUrl: v.string(),
+    imageStorageId: v.optional(v.id("_storage")),
     gallery: v.array(v.string()),
     isVirtual: v.boolean(),
     isVisible: v.optional(v.boolean()),

@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Package, Edit, Trash2, Plus, X, AlertCircle, Eye, EyeOff, GripVertical } from "lucide-react";
+import { Package, Edit, Trash2, Plus, X, AlertCircle, Eye, EyeOff, GripVertical, Upload, CheckCircle2 } from "lucide-react";
 import type { Id } from "../../convex/_generated/dataModel";
 import {
   DndContext,
@@ -60,6 +60,7 @@ type ProductForm = {
   description: string | null;
   shortDescription?: string;
   imageUrl: string;
+  imageStorageId?: Id<"_storage">;
   gallery: string[];
   isVirtual: boolean;
   isVisible?: boolean;
@@ -72,6 +73,7 @@ const emptyProduct: ProductForm = {
   description: "",
   shortDescription: "",
   imageUrl: "",
+  imageStorageId: undefined,
   gallery: [],
   isVirtual: false,
   variants: [{ variantId: "default", name: "Default", price: 0, hideStockIfAbove: 1000 }],
@@ -204,14 +206,17 @@ export function ProductEditorPage() {
   const toggleVisibility = useMutation(api.products.toggleVisibility);
   const updateStock = useMutation(api.stock.updateStock);
   const reorderProducts = useMutation(api.products.reorderProducts);
+  const generateImageUploadUrl = useMutation(api.products.generateUploadUrl);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductForm>(emptyProduct);
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<Id<"products"> | null>(null);
   const [orderedProducts, setOrderedProducts] = useState<typeof products>([]);
   const isReorderingRef = useRef(false);
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -254,6 +259,7 @@ export function ProductEditorPage() {
       description: product.description,
       shortDescription: product.shortDescription,
       imageUrl: product.imageUrl,
+      imageStorageId: product.imageStorageId,
       gallery: product.gallery,
       isVirtual: product.isVirtual,
       isVisible: product.isVisible,
@@ -292,8 +298,8 @@ export function ProductEditorPage() {
       setError("Product name is required");
       return;
     }
-    if (!editingProduct.imageUrl.trim()) {
-      setError("Image URL is required");
+    if (!editingProduct.imageUrl.trim() && !editingProduct.imageStorageId) {
+      setError("Either an image URL or uploaded image is required");
       return;
     }
     if (editingProduct.variants.length === 0) {
@@ -334,6 +340,7 @@ export function ProductEditorPage() {
           description: editingProduct.description,
           shortDescription: editingProduct.shortDescription,
           imageUrl: editingProduct.imageUrl,
+          imageStorageId: editingProduct.imageStorageId,
           gallery: editingProduct.gallery,
           isVirtual: editingProduct.isVirtual,
           isVisible: editingProduct.isVisible,
@@ -347,6 +354,7 @@ export function ProductEditorPage() {
           description: editingProduct.description,
           shortDescription: editingProduct.shortDescription,
           imageUrl: editingProduct.imageUrl,
+          imageStorageId: editingProduct.imageStorageId,
           gallery: editingProduct.gallery,
           isVirtual: editingProduct.isVirtual,
           isVisible: editingProduct.isVisible,
@@ -456,6 +464,40 @@ export function ProductEditorPage() {
     const newGallery = [...editingProduct.gallery];
     newGallery[index] = value;
     setEditingProduct({ ...editingProduct, gallery: newGallery });
+  };
+
+  const handleUploadImage = async (file: File | null) => {
+    if (!file) return;
+
+    setError("");
+    setIsUploadingImage(true);
+    try {
+      const postUrl: string = await generateImageUploadUrl({});
+      const result = await fetch(postUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": file.type || "application/octet-stream",
+        },
+        body: file,
+      });
+
+      if (!result.ok) {
+        throw new Error("Image upload failed");
+      }
+
+      const { storageId } = await result.json() as { storageId: Id<"_storage"> };
+      setEditingProduct((prev) => ({
+        ...prev,
+        imageStorageId: storageId,
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upload image");
+    } finally {
+      setIsUploadingImage(false);
+      if (imageFileInputRef.current) {
+        imageFileInputRef.current.value = "";
+      }
+    }
   };
 
   const addCustomField = (variantIndex: number) => {
@@ -643,7 +685,34 @@ export function ProductEditorPage() {
             </div>
 
             <div>
-              <Label htmlFor="imageUrl">Image URL *</Label>
+              <div className="flex items-center justify-between mb-2">
+                <Label htmlFor="imageUrl">Image URL</Label>
+                <div className="flex items-center gap-2">
+                  {editingProduct.imageStorageId && (
+                    <span className="text-xs text-emerald-600 flex items-center gap-1">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Uploaded to Convex
+                    </span>
+                  )}
+                  <input
+                    ref={imageFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleUploadImage(e.target.files?.[0] || null)}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => imageFileInputRef.current?.click()}
+                    disabled={isUploadingImage || isSaving}
+                  >
+                    <Upload className="h-4 w-4 mr-1" />
+                    {isUploadingImage ? "Uploading..." : "Upload"}
+                  </Button>
+                </div>
+              </div>
               <Input
                 id="imageUrl"
                 value={editingProduct.imageUrl}
@@ -651,10 +720,14 @@ export function ProductEditorPage() {
                   setEditingProduct({
                     ...editingProduct,
                     imageUrl: e.target.value,
+                    imageStorageId: e.target.value.trim() ? undefined : editingProduct.imageStorageId,
                   })
                 }
                 placeholder="https://example.com/image.jpg"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Provide an external URL or upload an image file.
+              </p>
             </div>
 
             <div>
