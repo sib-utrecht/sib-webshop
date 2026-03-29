@@ -38,6 +38,7 @@ const productValidator = v.object({
   imageUrl: v.string(),
   imageStorageId: v.optional(v.id("_storage")),
   gallery: v.array(v.string()),
+  galleryStorageIds: v.optional(v.array(v.id("_storage"))),
   isVirtual: v.boolean(),
   isVisible: v.optional(v.boolean()),
   sortOrder: v.optional(v.number()),
@@ -88,6 +89,7 @@ const productWithStockValidator = v.object({
   imageUrl: v.string(),
   imageStorageId: v.optional(v.id("_storage")),
   gallery: v.array(v.string()),
+  galleryStorageIds: v.optional(v.array(v.id("_storage"))),
   isVirtual: v.boolean(),
   isVisible: v.optional(v.boolean()),
   sortOrder: v.optional(v.number()),
@@ -107,6 +109,28 @@ async function resolveProductImageUrl(
 
   const storageUrl = await ctx.storage.getUrl(product.imageStorageId);
   return storageUrl ?? product.imageUrl;
+}
+
+async function resolveProductGalleryUrls(
+  ctx: QueryCtx,
+  product: {
+    gallery: Array<string>;
+    galleryStorageIds?: Array<Id<"_storage">>;
+  }
+) {
+  if (!product.galleryStorageIds || product.galleryStorageIds.length === 0) {
+    return product.gallery;
+  }
+
+  const uploadedUrls = await Promise.all(
+    product.galleryStorageIds.map((storageId) => ctx.storage.getUrl(storageId))
+  );
+
+  const resolvedUploadedUrls = uploadedUrls.filter(
+    (url): url is string => url !== null
+  );
+
+  return [...product.gallery, ...resolvedUploadedUrls];
 }
 
 export const generateUploadUrl = mutation({
@@ -138,11 +162,13 @@ export const list = query({
     const productsWithStock = await Promise.all(
       visibleProducts.map(async (product) => {
         const imageUrl = await resolveProductImageUrl(ctx, product);
+        const gallery = await resolveProductGalleryUrls(ctx, product);
         const variants = await loadProductVariants(ctx, product._id);
 
         return {
           ...product,
           imageUrl,
+          gallery,
           variants,
         };
       })
@@ -160,11 +186,13 @@ export const getById = query({
     if (!product) return null;
     
     const imageUrl = await resolveProductImageUrl(ctx, product);
+    const gallery = await resolveProductGalleryUrls(ctx, product);
     const variants = await loadProductVariants(ctx, product._id);
     
     return {
       ...product,
       imageUrl,
+      gallery,
       variants,
     };
   },
@@ -185,11 +213,13 @@ export const getByProductId = query({
     }
     
     const imageUrl = await resolveProductImageUrl(ctx, product);
+    const gallery = await resolveProductGalleryUrls(ctx, product);
     const variants = await loadProductVariants(ctx, product._id);
     
     return {
       ...product,
       imageUrl,
+      gallery,
       variants,
     };
   },
@@ -204,6 +234,7 @@ export const create = mutation({
     imageUrl: v.string(),
     imageStorageId: v.optional(v.id("_storage")),
     gallery: v.array(v.string()),
+    galleryStorageIds: v.optional(v.array(v.id("_storage"))),
     isVirtual: v.boolean(),
     isVisible: v.optional(v.boolean()),
     variants: v.array(
@@ -253,6 +284,7 @@ export const create = mutation({
       imageUrl: args.imageUrl,
       imageStorageId: args.imageStorageId,
       gallery: args.gallery,
+      galleryStorageIds: args.galleryStorageIds,
       isVirtual: args.isVirtual,
       isVisible: args.isVisible ?? true,
     });
@@ -316,6 +348,7 @@ export const update = mutation({
     imageUrl: v.string(),
     imageStorageId: v.optional(v.id("_storage")),
     gallery: v.array(v.string()),
+    galleryStorageIds: v.optional(v.array(v.id("_storage"))),
     isVirtual: v.boolean(),
     isVisible: v.optional(v.boolean()),
     variants: v.array(
@@ -373,6 +406,7 @@ export const update = mutation({
       imageUrl: args.imageUrl,
       imageStorageId: args.imageStorageId,
       gallery: args.gallery,
+      galleryStorageIds: args.galleryStorageIds,
       isVirtual: args.isVirtual,
       isVisible: args.isVisible,
     });

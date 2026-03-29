@@ -62,6 +62,7 @@ type ProductForm = {
   imageUrl: string;
   imageStorageId?: Id<"_storage">;
   gallery: string[];
+  galleryStorageIds?: Id<"_storage">[];
   isVirtual: boolean;
   isVisible?: boolean;
   variants: Variant[];
@@ -75,6 +76,7 @@ const emptyProduct: ProductForm = {
   imageUrl: "",
   imageStorageId: undefined,
   gallery: [],
+  galleryStorageIds: [],
   isVirtual: false,
   variants: [{ variantId: "default", name: "Default", price: 0, hideStockIfAbove: 1000 }],
 };
@@ -217,6 +219,7 @@ export function ProductEditorPage() {
   const [orderedProducts, setOrderedProducts] = useState<typeof products>([]);
   const isReorderingRef = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
+  const galleryFileInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -261,6 +264,7 @@ export function ProductEditorPage() {
       imageUrl: product.imageUrl,
       imageStorageId: product.imageStorageId,
       gallery: product.gallery,
+      galleryStorageIds: product.galleryStorageIds || [],
       isVirtual: product.isVirtual,
       isVisible: product.isVisible,
       variants: product.variants.map((v) => ({
@@ -342,6 +346,7 @@ export function ProductEditorPage() {
           imageUrl: editingProduct.imageUrl,
           imageStorageId: editingProduct.imageStorageId,
           gallery: editingProduct.gallery,
+          galleryStorageIds: editingProduct.galleryStorageIds,
           isVirtual: editingProduct.isVirtual,
           isVisible: editingProduct.isVisible,
           variants: variantsWithoutStock,
@@ -356,6 +361,7 @@ export function ProductEditorPage() {
           imageUrl: editingProduct.imageUrl,
           imageStorageId: editingProduct.imageStorageId,
           gallery: editingProduct.gallery,
+          galleryStorageIds: editingProduct.galleryStorageIds,
           isVirtual: editingProduct.isVirtual,
           isVisible: editingProduct.isVisible,
           variants: variantsWithoutStock,
@@ -466,7 +472,21 @@ export function ProductEditorPage() {
     setEditingProduct({ ...editingProduct, gallery: newGallery });
   };
 
-  const handleUploadImage = async (file: File | null) => {
+  const addGalleryStorageImage = (storageId: Id<"_storage">) => {
+    setEditingProduct((prev) => ({
+      ...prev,
+      galleryStorageIds: [...(prev.galleryStorageIds || []), storageId],
+    }));
+  };
+
+  const removeGalleryStorageImage = (index: number) => {
+    setEditingProduct((prev) => ({
+      ...prev,
+      galleryStorageIds: (prev.galleryStorageIds || []).filter((_, i) => i !== index),
+    }));
+  };
+
+  const uploadToConvexStorage = async (file: File | null) => {
     if (!file) return;
 
     setError("");
@@ -486,19 +506,61 @@ export function ProductEditorPage() {
       }
 
       const { storageId } = await result.json() as { storageId: Id<"_storage"> };
-      setEditingProduct((prev) => ({
-        ...prev,
-        imageStorageId: storageId,
-      }));
+      return storageId;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to upload image");
+      return null;
     } finally {
       setIsUploadingImage(false);
+    }
+  };
+
+  const handleUploadImage = async (file: File | null) => {
+    const storageId = await uploadToConvexStorage(file);
+    if (!storageId) {
       if (imageFileInputRef.current) {
         imageFileInputRef.current.value = "";
       }
+      return;
+    }
+
+    setEditingProduct((prev) => ({
+      ...prev,
+      imageStorageId: storageId,
+    }));
+
+    if (imageFileInputRef.current) {
+      imageFileInputRef.current.value = "";
     }
   };
+
+  const handleUploadGalleryImage = async (file: File | null) => {
+    const storageId = await uploadToConvexStorage(file);
+    if (!storageId) {
+      if (galleryFileInputRef.current) {
+        galleryFileInputRef.current.value = "";
+      }
+      return;
+    }
+
+    addGalleryStorageImage(storageId);
+
+    if (galleryFileInputRef.current) {
+      galleryFileInputRef.current.value = "";
+    }
+  };
+
+  const uploadedGalleryCount = editingProduct.galleryStorageIds?.length || 0;
+
+  const galleryUploadLabel = isUploadingImage
+    ? "Uploading..."
+    : uploadedGalleryCount > 0
+      ? `Uploaded (${uploadedGalleryCount})`
+      : "Upload Image";
+
+  const mainImageUploadLabel = isUploadingImage ? "Uploading..." : "Upload";
+
+  const hasUploadedGallery = uploadedGalleryCount > 0;
 
   const addCustomField = (variantIndex: number) => {
     const newVariants = [...editingProduct.variants];
@@ -709,7 +771,7 @@ export function ProductEditorPage() {
                     disabled={isUploadingImage || isSaving}
                   >
                     <Upload className="h-4 w-4 mr-1" />
-                    {isUploadingImage ? "Uploading..." : "Upload"}
+                    {mainImageUploadLabel}
                   </Button>
                 </div>
               </div>
@@ -733,16 +795,54 @@ export function ProductEditorPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <Label>Gallery Images</Label>
-                <Button
-                  type="button"
-                  onClick={addGalleryImage}
-                  size="sm"
-                  variant="outline"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Image
-                </Button>
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={galleryFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleUploadGalleryImage(e.target.files?.[0] || null)}
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => galleryFileInputRef.current?.click()}
+                    size="sm"
+                    variant="outline"
+                    disabled={isUploadingImage || isSaving}
+                  >
+                    <Upload className="h-4 w-4 mr-1" />
+                    {galleryUploadLabel}
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={addGalleryImage}
+                    size="sm"
+                    variant="outline"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add URL
+                  </Button>
+                </div>
               </div>
+              {hasUploadedGallery && (
+                <div className="space-y-2 mb-3">
+                  {(editingProduct.galleryStorageIds || []).map((storageId, index) => (
+                    <div key={storageId} className="flex items-center gap-2">
+                      <div className="flex-1 text-xs text-muted-foreground bg-muted px-3 py-2 rounded-md truncate">
+                        Uploaded image {index + 1}: {storageId}
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={() => removeGalleryStorageImage(index)}
+                        size="icon"
+                        variant="destructive"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
               {editingProduct.gallery.map((url, index) => (
                 <div key={index} className="flex gap-2 mb-2">
                   <Input

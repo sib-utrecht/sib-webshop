@@ -10,6 +10,7 @@ export default defineSchema({
     imageUrl: v.string(),
     imageStorageId: v.optional(v.id("_storage")),
     gallery: v.array(v.string()),
+    galleryStorageIds: v.optional(v.array(v.id("_storage"))),
     isVirtual: v.boolean(),
     isVisible: v.optional(v.boolean()),
     sortOrder: v.optional(v.number()),
