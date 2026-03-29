@@ -281,7 +281,11 @@ export function ProductEditorPage() {
 
     // Validation
     if (!editingProduct.productId.trim()) {
-      setError("Product ID is required");
+      setError("Product URL slug is required");
+      return;
+    }
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(editingProduct.productId)) {
+      setError("Product URL slug may only contain lowercase letters, numbers, and hyphens, and must start with a letter or number");
       return;
     }
     if (!editingProduct.name.trim()) {
@@ -571,32 +575,40 @@ export function ProductEditorPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="productId">Product ID *</Label>
+            <div>
+              <Label htmlFor="productId">Product URL *</Label>
+              <div className="flex rounded-md border border-input overflow-hidden focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+                <span className="flex items-center px-3 bg-muted text-muted-foreground text-sm whitespace-nowrap border-r border-input select-none">
+                  https://shop.sib-utrecht.nl/product/
+                </span>
                 <Input
                   id="productId"
                   value={editingProduct.productId}
-                  onChange={(e) =>
-                    setEditingProduct({
-                      ...editingProduct,
-                      productId: e.target.value,
-                    })
-                  }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setEditingProduct({ ...editingProduct, productId: val });
+                  }}
                   placeholder="e.g., gala2026"
+                  className="border-0 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
               </div>
-              <div>
-                <Label htmlFor="name">Name *</Label>
-                <Input
-                  id="name"
-                  value={editingProduct.name}
-                  onChange={(e) =>
-                    setEditingProduct({ ...editingProduct, name: e.target.value })
-                  }
-                  placeholder="e.g., Gala 2026"
-                />
-              </div>
+              {editingProduct.productId && !/^[a-z0-9][a-z0-9-]*$/.test(editingProduct.productId) && (
+                <p className="text-xs text-destructive mt-1">
+                  Only lowercase letters, numbers, and hyphens allowed; must start with a letter or number.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="name">Name *</Label>
+              <Input
+                id="name"
+                value={editingProduct.name}
+                onChange={(e) =>
+                  setEditingProduct({ ...editingProduct, name: e.target.value })
+                }
+                placeholder="e.g., Gala 2026"
+              />
             </div>
 
             <div>
