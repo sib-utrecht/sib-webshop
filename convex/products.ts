@@ -190,6 +190,7 @@ export const create = mutation({
         )),
         secondaryStockVariantId: v.optional(v.string()),
         secondaryStockFactor: v.optional(v.number()),
+        hideStockIfAbove: v.optional(v.number()),
       })
     ),
   },
@@ -218,7 +219,7 @@ export const create = mutation({
       isVisible: args.isVisible ?? true,
     });
 
-    // Insert variants into variants table
+    // Insert variants into variants table (first pass: no secondaryStock yet)
     for (const variant of args.variants) {
       await ctx.db.insert("variants", {
         productId: productDbId,
@@ -228,9 +229,39 @@ export const create = mutation({
         maxQuantity: variant.maxQuantity,
         requiredAgreements: variant.requiredAgreements,
         customFields: variant.customFields,
+        hideStockIfAbove: variant.hideStockIfAbove,
         quantity: 0,
         reserved: 0,
       });
+    }
+
+    // Second pass: resolve secondaryStockVariantId references to DB IDs
+    const insertedVariants = await ctx.db
+      .query("variants")
+      .withIndex("by_product_id", (q) => q.eq("productId", productDbId))
+      .collect();
+
+    const variantIdToDbId = new Map(
+      insertedVariants.map((v) => [v.variantId, v._id])
+    );
+
+    for (const variant of args.variants) {
+      if (variant.secondaryStockVariantId) {
+        const secondaryStockDbId = variantIdToDbId.get(variant.secondaryStockVariantId);
+        const currentVariantDbId = variantIdToDbId.get(variant.variantId);
+
+        if (secondaryStockDbId && currentVariantDbId) {
+          const factor = variant.secondaryStockFactor ?? 1;
+          if (!Number.isInteger(factor) || factor < 1) {
+            throw new Error("secondaryStockFactor must be a positive integer (>= 1) when provided");
+          }
+
+          await ctx.db.patch(currentVariantDbId, {
+            secondaryStock: secondaryStockDbId,
+            secondaryStockFactor: factor,
+          });
+        }
+      }
     }
 
     return productDbId;
